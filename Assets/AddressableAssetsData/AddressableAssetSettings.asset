@@ -1,0 +1,148 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 468a46d0ae32c3544b7d98094e6448a9, type: 3}
+  m_Name: AddressableAssetSettings
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetSettings
+  m_DefaultGroup: c376a5da9eb2cb946bf441620b4ab548
+  m_currentHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_ExtractTypeTreeData: 0
+  m_DisableWriteTypeTree: 0
+  m_OptimizeCatalogSize: 0
+  m_BuildRemoteCatalog: 0
+  m_BundleLocalCatalog: 0
+  m_CatalogRequestsTimeout: 0
+  m_DisableCatalogUpdateOnStart: 0
+  m_InternalIdNamingMode: 0
+  m_InternalBundleIdMode: 1
+  m_AssetLoadMode: 0
+  m_BundledAssetProviderType:
+    m_AssemblyName: 
+    m_ClassName: 
+  m_AssetBundleProviderType:
+    m_AssemblyName: 
+    m_ClassName: 
+  m_IgnoreUnsupportedFilesInBuild: 0
+  m_UniqueBundleIds: 0
+  m_EnableJsonCatalog: 0
+  m_NonRecursiveBuilding: 1
+  m_AllowNestedBundleFolders: 0
+  m_CCDEnabled: 0
+  m_maxConcurrentWebRequests: 3
+  m_UseUWRForLocalBundles: 0
+  m_BundleTimeout: 0
+  m_BundleRetryCount: 0
+  m_BundleRedirectLimit: -1
+  m_SharedBundleSettings: 0
+  m_SharedBundleSettingsCustomGroupIndex: 0
+  m_simulatedLoadDelay: 0.1
+  m_ContiguousBundles: 1
+  m_StripUnityVersionFromBundleBuild: 0
+  m_DisableVisibleSubAssetRepresentations: 0
+  m_BuiltInBundleNaming: 0
+  mBuiltInBundleCustomNaming: 
+  m_MonoScriptBundleNaming: 0
+  m_CheckForContentUpdateRestrictionsOption: 0
+  m_MonoScriptBundleCustomNaming: 
+  m_RemoteCatalogBuildPath:
+    m_Id: 
+  m_RemoteCatalogLoadPath:
+    m_Id: 
+  m_ContentStateBuildPathProfileVariableName: 
+  m_CustomContentStateBuildPath: 
+  m_ContentStateBuildPath: 
+  m_BuildAddressablesWithPlayerBuild: 0
+  m_overridePlayerVersion: '[UnityEditor.PlayerSettings.bundleVersion]'
+  m_GroupAssets:
+  - {fileID: 11400000, guid: 4139e2c9b340c4d40a4ee003878038be, type: 2}
+  - {fileID: 11400000, guid: f6152695008295b4a8be6bcd54b42906, type: 2}
+  - {fileID: 11400000, guid: fcc384d3c62fa0a41b6fd995518869f5, type: 2}
+  - {fileID: 11400000, guid: e313f3a7fc50e56489bb5a8135da783c, type: 2}
+  - {fileID: 11400000, guid: 67d3c9e5990a7f040aa08db85a10c36d, type: 2}
+  - {fileID: 11400000, guid: 38e391644f06ed24c8f730a578477932, type: 2}
+  - {fileID: 11400000, guid: 98e0da7633ad8ed45949b490805c395f, type: 2}
+  - {fileID: 11400000, guid: a0fbcfd1d6e89bc4da75f48304944089, type: 2}
+  m_BuildSettings:
+    m_LogResourceManagerExceptions: 1
+    m_BundleBuildPath: Temp/com.unity.addressables/AssetBundles
+  m_ProfileSettings:
+    m_Profiles:
+    - m_InheritedParent: 
+      m_Id: eaa237687dc62b34aabd6461bc946c21
+      m_ProfileName: Default
+      m_Values:
+      - m_Id: 264a16bbf28432942aa2cca8d29bb8fa
+        m_Value: '{UnityEngine.AddressableAssets.Addressables.RuntimePath}/[BuildTarget]'
+      - m_Id: 3ba1b912106a99c44b754beb1d35133e
+        m_Value: '[UnityEngine.AddressableAssets.Addressables.BuildPath]/[BuildTarget]'
+      - m_Id: 4221cfdfb2b8feb4cb2e9fe25128c759
+        m_Value: '[UnityEditor.EditorUserBuildSettings.activeBuildTarget]'
+      - m_Id: 4e0c7d507438c2142acc93c0469fef6c
+        m_Value: 'ServerData/[BuildTarget]'
+      - m_Id: 9e93322d7fa303d42becf310a07069e1
+        m_Value: <undefined>
+    - m_InheritedParent: 
+      m_Id: b32e03074dfa54440863fcd3162c6321
+      m_ProfileName: AtmosphereAutopilotRedux
+      m_Values:
+      - m_Id: 264a16bbf28432942aa2cca8d29bb8fa
+        m_Value: '{SpaceWarpPaths.AtmosphereAutopilotRedux}/addressables/StandaloneWindows64'
+      - m_Id: 3ba1b912106a99c44b754beb1d35133e
+        m_Value: Library/com.unity.addressables/aa/Windows/StandaloneWindows64
+      - m_Id: 4221cfdfb2b8feb4cb2e9fe25128c759
+        m_Value: '[UnityEditor.EditorUserBuildSettings.activeBuildTarget]'
+      - m_Id: 4e0c7d507438c2142acc93c0469fef6c
+        m_Value: 'ServerData/[BuildTarget]'
+      - m_Id: 9e93322d7fa303d42becf310a07069e1
+        m_Value: <undefined>
+    m_ProfileEntryNames:
+    - m_Id: 264a16bbf28432942aa2cca8d29bb8fa
+      m_Name: Local.LoadPath
+      m_InlineUsage: 0
+    - m_Id: 3ba1b912106a99c44b754beb1d35133e
+      m_Name: Local.BuildPath
+      m_InlineUsage: 0
+    - m_Id: 4221cfdfb2b8feb4cb2e9fe25128c759
+      m_Name: BuildTarget
+      m_InlineUsage: 0
+    - m_Id: 4e0c7d507438c2142acc93c0469fef6c
+      m_Name: Remote.BuildPath
+      m_InlineUsage: 0
+    - m_Id: 9e93322d7fa303d42becf310a07069e1
+      m_Name: Remote.LoadPath
+      m_InlineUsage: 0
+    m_ProfileVersion: 1
+  m_LabelTable:
+    m_LabelNames:
+    - default
+    - parts_data
+    - celestial_bodies
+    - scienceExperiment
+    - missions
+    - techNodeData
+    - resources
+    - AtmosphereAutopilotRedux_patches
+    - AtmosphereAutopilotRedux_prefab_patches
+  m_SchemaTemplates: []
+  m_GroupTemplateObjects:
+  - {fileID: 11400000, guid: 752621008dd584e4abcf7b7dcc3e7c7a, type: 2}
+  m_InitializationObjects: []
+  m_CertificateHandlerType:
+    m_AssemblyName: 
+    m_ClassName: 
+  m_ActivePlayerDataBuilderIndex: 2
+  m_DataBuilders:
+  - {fileID: 11400000, guid: 95fc4736deb030f469ba2e6e0c8009ac, type: 2}
+  - {fileID: 11400000, guid: a801ad3f672313c4d8a349b9c4a2d42f, type: 2}
+  - {fileID: 11400000, guid: 29fc353663640c9409bae9e40bd42e79, type: 2}
+  m_ActiveProfileId: eaa237687dc62b34aabd6461bc946c21
