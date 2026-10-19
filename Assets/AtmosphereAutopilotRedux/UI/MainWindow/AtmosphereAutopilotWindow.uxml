@@ -1,0 +1,15 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="project://database/Assets/AtmosphereAutopilotRedux/UI/MainWindow/MainWindowStyles.uss?fileID=7433441132597879392&amp;guid=690b90a557da29041bc80f138c7fb63a&amp;type=3#MainWindowStyles"/>
+    <UitkForKsp2.Controls.AppShell title="Atmosphere Autopilot" show-close-button="true">
+        <ui:VisualElement style="flex-grow: 1; flex-direction: row;">
+            <ui:Button text="Fly By Wire" name="FBW" class="mode_button"/>
+            <ui:Button text="Cruise Control" name="Cruise" class="mode_button"/>
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-grow: 1;">
+            <ui:Label text="Speed Controls" style="-unity-font-style: bold; -unity-text-align: upper-center;"/>
+            <ui:VisualElement style="flex-grow: 1; flex-direction: row;">
+                <ui:Slider label="Speed" value="42" high-value="2000"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </UitkForKsp2.Controls.AppShell>
+</ui:UXML>

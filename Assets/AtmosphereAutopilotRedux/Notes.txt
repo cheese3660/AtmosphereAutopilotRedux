@@ -1,0 +1,6 @@
+﻿This is meant to be a port of the AtmosphereAutopilot mod from KSP1
+
+There are a few things that might get in the way of this
+- Every single autopilot module is it's own serialized part module on the craft, this is a bit confusing, and not how it
+  should be
+- There are a lot of Math helper files, we should just copy these 1:1
