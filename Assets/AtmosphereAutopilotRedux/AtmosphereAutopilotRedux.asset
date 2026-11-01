@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Mod
   id: AtmosphereAutopilotRedux
   name: AtmosphereAutopilotRedux
-  author: nobody
-  description: A sample mod for KSP2
-  version: 0.1.0
+  author: Infinity Irrealis (Port) & Boris Barboris (Original)
+  description: A port of the Atmosphere Autopilot KSP1 Mod to KSP2 Redux (GPL-3 Licensed)
+  version: 1.0.0
   versionCheck: 
   minKsp2Version: '*'
   maxKsp2Version: '*'

@@ -1,0 +1,27 @@
+{
+  "spec": "2.0",
+  "mod_id": "AtmosphereAutopilotRedux",
+  "name": "AtmosphereAutopilotRedux",
+  "author": "Infinity Irrealis (Port) & Boris Barboris (Original)",
+  "description": "A port of the Atmosphere Autopilot KSP1 Mod to KSP2 Redux (GPL-3 Licensed)",
+  "source": "",
+  "version": "1.0.0",
+  "version_check": "",
+  "addressable_script_label": "AtmosphereAutopilotRedux_patches",
+  "addressable_prefab_patch_label": "AtmosphereAutopilotRedux_prefab_patches",
+  "ksp2_version": {
+    "min": "*",
+    "max": "*"
+  },
+  "dependencies": [
+    {
+      "id": "SpaceWarp2",
+      "version": {
+        "min": "2.0.0",
+        "max": "*"
+      }
+    }
+  ],
+  "conflicts": [],
+  "main_assembly": "AtmosphereAutopilotRedux.dll"
+}
