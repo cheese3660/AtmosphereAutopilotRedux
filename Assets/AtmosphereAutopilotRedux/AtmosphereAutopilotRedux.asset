@@ -16,7 +16,7 @@ MonoBehaviour:
   name: AtmosphereAutopilotRedux
   author: Infinity Irrealis (Port) & Boris Barboris (Original)
   description: A port of the Atmosphere Autopilot KSP1 Mod to KSP2 Redux (GPL-3 Licensed)
-  version: 1.1.0
+  version: 2.0.0
   versionCheck: https://raw.githubusercontent.com/cheese3660/AtmosphereAutopilotRedux/refs/heads/main/Assets/AtmosphereAutopilotRedux/swinfo.json
   minKsp2Version: '*'
   maxKsp2Version: '*'

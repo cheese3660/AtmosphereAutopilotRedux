@@ -5,6 +5,7 @@ using AtmosphereAutopilotRedux.Runtime;
 using KSP.Game;
 using KSP.Sim.Definitions;
 using KSP.Sim.impl;
+using Redux.UI.AppBar;
 using UitkForKsp2.API;
 using UitkForKsp2.Controls;
 using UnityEngine;
@@ -35,7 +36,8 @@ namespace AtmosphereAutopilotRedux
 
         private enum Vertical { Off, Altitude, Speed }
 
-        // The cruise settings live in the window, so they carry over to a new vessel
+        // The cruise settings live in the window. Each vessel's are kept in the save (AutopilotSaves) and come back
+        // when it is flown again; a vessel without a record picks up whatever is set
         private Course _course = Course.Hold;
         private Vertical _vertical = Vertical.Off;
 
@@ -53,7 +55,14 @@ namespace AtmosphereAutopilotRedux
             _root?.CenterByDefault();
             var shell = _root as AppShell ?? _root?.Q<AppShell>();
             if (shell != null)
-                shell.CloseClicked += () => isOpen = false;
+                shell.CloseClicked += () =>
+                {
+                    // Turn the app bar button off too, or it stays lit and the next press only turns it off. The
+                    // toggle's callback closes the window; setting it here covers a button the lookup can't find,
+                    // such as one in a collapsed tray.
+                    AppBar.SetAppBarButtonIndicator(AtmosphereAutopilotReduxPlugin.AppButtonId, false);
+                    isOpen = false;
+                };
 
             _noControl = _root.Q<Label>("NoControl");
             _fbwButton = _root.Q<Button>("FBW");
@@ -109,9 +118,12 @@ namespace AtmosphereAutopilotRedux
 
             RefreshSelectors();
 
+            AutopilotSaves.Saving += StoreActiveState;
+            AutopilotSaves.Loaded += OnSaveLoaded;
             _runtime = GetComponent<AARuntime>();
             if (_runtime != null)
             {
+                _runtime.ContextChanging += StoreState;
                 _runtime.ContextChanged += OnContextChanged;
                 SetContext(_runtime.Context);
             }
@@ -121,8 +133,13 @@ namespace AtmosphereAutopilotRedux
 
         private void OnDestroy()
         {
+            AutopilotSaves.Saving -= StoreActiveState;
+            AutopilotSaves.Loaded -= OnSaveLoaded;
             if (_runtime != null)
+            {
+                _runtime.ContextChanging -= StoreState;
                 _runtime.ContextChanged -= OnContextChanged;
+            }
             SetContext(null);
         }
 
@@ -132,6 +149,7 @@ namespace AtmosphereAutopilotRedux
 
         public void Update()
         {
+            UpdateRestore();
             if (!isOpen)
             {
                 _root.style.display = DisplayStyle.None;
@@ -164,8 +182,8 @@ namespace AtmosphereAutopilotRedux
             {
                 _context.ActiveControllerChanged += RefreshModeButtons;
                 _context.Cruise.WaypointReached += PullCruiseState;
-                // The settings live in the window, so a new vessel picks up whatever is set there
                 RefreshWaypoints();
+                ApplyState(AutopilotSaves.Find(VesselId(_context)));
                 PushSpeed();
                 PushHeading();
                 PushWaypoint();
@@ -179,6 +197,7 @@ namespace AtmosphereAutopilotRedux
         {
             if (_context == null || controller == null)
                 return;
+            _restoreController = null;      // the pilot decides now
             if (_context.ActiveController == controller)
                 _context.Disengage();
             else
@@ -333,6 +352,162 @@ namespace AtmosphereAutopilotRedux
                     cruise.vertical_control = false;
                     break;
             }
+        }
+
+        #endregion
+
+        #region Saved state
+
+        // Engages the vessel's saved mode once it has flown off rails for this many physics steps, enough for the
+        // differences the controllers work from to span real flight
+        private const int restore_steps = 3;
+
+        private StateController _restoreController;
+        private AutopilotContext _restoreContext;
+        private double _restoreFlyingSince = double.NaN;
+
+        private static string VesselId(AutopilotContext context) => context?.Vessel.Sim?.GlobalId.ToString();
+
+        private VesselAutopilotState CaptureState(AutopilotContext context)
+        {
+            var active = context.ActiveController;
+            // A restore still waiting counts as engaged, so saving or switching straight after a load keeps it
+            if (active == null && _restoreContext == context)
+                active = _restoreController;
+            var waypoint = SelectedWaypoint();
+            var model = context.FlightModel;
+            double[][] models = null;
+            double[] scales = null;
+            if (model.HasLearned)
+            {
+                models = model.ExportModels();
+                scales = new double[context.VelocityControllers.Length];
+                for (var i = 0; i < scales.Length; i++)
+                    scales[i] = context.VelocityControllers[i].DebugAccController.DebugIndiScale;
+            }
+            return new VesselAutopilotState
+            {
+                Mass = context.Vessel.Sim.totalMass,
+                PartCount = PartCount(context),
+                Models = models,
+                IndiScales = scales,
+                Engaged = active == null ? "Off" : active == context.Cruise ? "Cruise" : "FlyByWire",
+                Course = _course.ToString(),
+                Heading = _headingInput.value,
+                WaypointId = waypoint != null ? waypoint.GlobalId.ToString() : "",
+                Vertical = _vertical.ToString(),
+                Altitude = _altitudeInput.value,
+                VerticalSpeed = _vsInput.value,
+                SpeedHold = _speedEnabled.value,
+                Speed = _speedInput.value,
+            };
+        }
+
+        // The context is about to be disposed, which disengages it, so its record is taken first
+        private void StoreState(AutopilotContext context)
+        {
+            if (context != null && context == _context)
+                AutopilotSaves.Store(VesselId(context), CaptureState(context));
+        }
+
+        private void StoreActiveState() => StoreState(_context);
+
+        private void OnSaveLoaded()
+        {
+            if (_context == null)
+                return;
+            ApplyState(AutopilotSaves.Find(VesselId(_context)));
+            PushAll();
+        }
+
+        // Puts a vessel's record into the window and lines up its mode to engage. The caller pushes the settings.
+        private void ApplyState(VesselAutopilotState state)
+        {
+            _restoreController = null;
+            if (state == null || _context == null)
+                return;
+            if (Enum.TryParse(state.Course, out Course course))
+                _course = course;
+            if (Enum.TryParse(state.Vertical, out Vertical vertical))
+                _vertical = vertical;
+            _headingInput.SetValueWithoutNotify(state.Heading);
+            _altitudeInput.SetValueWithoutNotify(state.Altitude);
+            _vsInput.SetValueWithoutNotify(state.VerticalSpeed);
+            _speedEnabled.SetValueWithoutNotify(state.SpeedHold);
+            _speedInput.SetValueWithoutNotify(state.Speed);
+            var index = _waypoints.FindIndex(w => w.GlobalId.ToString() == state.WaypointId);
+            if (index >= 0)
+                _waypointField.index = index;
+            else if (_course == Course.Waypoint)
+                _course = Course.Hold;      // the waypoint is gone
+            RefreshSelectors();
+            RestoreModel(state);
+
+            _restoreController = state.Engaged == "Cruise" ? _context.Cruise :
+                state.Engaged == "FlyByWire" ? (StateController)_context.FlyByWire : null;
+            _restoreContext = _context;
+            _restoreFlyingSince = double.NaN;
+        }
+
+        private static int PartCount(AutopilotContext context) =>
+            context.Vessel.Sim?.SimulationObject?.PartOwner?.PartCount ?? 0;
+
+        // Largest mass change, as a share, the saved model is still trusted across
+        private const double model_mass_tolerance = 0.02;
+
+        // The learned model only fits the vessel it was learned on; staged, docked or refuelled it starts fresh
+        private void RestoreModel(VesselAutopilotState state)
+        {
+            if (state.Models == null || _context == null)
+                return;
+            var mass = _context.Vessel.Sim.totalMass;
+            if (state.PartCount != PartCount(_context) ||
+                Math.Abs(mass - state.Mass) > model_mass_tolerance * Math.Max(1e-3, state.Mass))
+                return;
+            if (!_context.FlightModel.ImportModels(state.Models) || state.IndiScales == null)
+                return;
+            var controllers = _context.VelocityControllers;
+            for (var i = 0; i < controllers.Length && i < state.IndiScales.Length; i++)
+                controllers[i].DebugAccController.RestoreIndiScale(state.IndiScales[i]);
+        }
+
+        private void PushAll()
+        {
+            PushSpeed();
+            PushHeading();
+            PushWaypoint();
+            PushLateral();
+            PushVertical();
+        }
+
+        // Waits for the vessel to fly, not just exist: paused, warping on rails or without control doesn't count
+        private void UpdateRestore()
+        {
+            if (_restoreController == null)
+                return;
+            if (_context == null || _restoreContext != _context)
+            {
+                _restoreController = null;
+                return;
+            }
+            var game = GameManager.Instance?.Game;
+            var warp = game?.ViewController?.TimeWarp;
+            var flying = game != null && !game.ViewController.IsPaused &&
+                (warp == null || !warp.IsWarping || warp.IsPhysicsTimeWarp) &&
+                _context.Vessel.Sim.ControlStatus != VesselControlState.NoControl;
+            if (!flying)
+            {
+                _restoreFlyingSince = double.NaN;
+                return;
+            }
+            if (double.IsNaN(_restoreFlyingSince))
+                _restoreFlyingSince = Time.fixedTimeAsDouble;
+            if (Time.fixedTimeAsDouble - _restoreFlyingSince < restore_steps * Time.fixedDeltaTime - 1e-6)
+                return;
+            var controller = _restoreController;
+            _restoreController = null;
+            if (_context.ActiveController != controller)
+                _context.Engage(controller);
         }
 
         #endregion

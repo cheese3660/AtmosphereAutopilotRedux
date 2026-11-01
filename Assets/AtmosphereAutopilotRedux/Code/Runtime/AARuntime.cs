@@ -50,6 +50,11 @@ namespace AtmosphereAutopilotRedux.Runtime
         /// </summary>
         public event Action ContextChanged;
 
+        /// <summary>
+        /// Raised just before <see cref="Context" /> is disposed and replaced, while it still knows what it was doing.
+        /// </summary>
+        public event Action<AutopilotContext> ContextChanging;
+
         private bool thread_paused;
 
         private void Awake()
@@ -97,6 +102,8 @@ namespace AtmosphereAutopilotRedux.Runtime
 
         private void SetContext(AutopilotContext context)
         {
+            if (Context != null)
+                ContextChanging?.Invoke(Context);
             Context?.Dispose();
             Context = context;
             ContextChanged?.Invoke();

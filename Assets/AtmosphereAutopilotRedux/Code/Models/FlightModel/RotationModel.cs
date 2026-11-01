@@ -91,7 +91,10 @@ namespace AtmosphereAutopilotRedux.Models
         /// <summary>
         /// Share of the angular velocity, torque change included, that survives this step's PhysX damping.
         /// </summary>
-        public float AngularDampingFactor => Mathf.Max(0.0f, 1.0f - angular_damping * Time.fixedDeltaTime);
+        // Mathf.Max passes a NaN through, and a damping not read yet would turn every rate difference to NaN
+        public float AngularDampingFactor => float.IsNaN(angular_damping) || float.IsInfinity(angular_damping)
+            ? 1.0f
+            : Mathf.Max(0.0f, 1.0f - angular_damping * Time.fixedDeltaTime);
 
         /// <summary>
         /// Lowest damping factor the torque acceleration divides by. Below the speed limit's damping, which keeps

@@ -195,7 +195,10 @@ namespace AtmosphereAutopilotRedux.Runtime
             if (FlightModel.Active || recording)
                 FlightModel.OnPreAutopilot(ctrl);
             if (engaged)
+            {
                 ActiveController.ApplyControl(ctrl);
+                offload_trim(raw_in);
+            }
             if (FlightModel.Active || recording)
                 FlightModel.OnPostAutopilot(ctrl);
             if (engaged)
@@ -203,6 +206,31 @@ namespace AtmosphereAutopilotRedux.Runtime
 
             if (recording)
                 recorder.Record(raw_in, prev_applied, ctrl, engaged);
+        }
+
+        /// <summary>
+        /// Time constant, s, the game's trim follows the autopilot's output with.
+        /// </summary>
+        public float trim_follow_time = 3.0f;
+
+        // Smallest stick deflection that counts as the pilot flying that axis
+        private const float pilot_input_tolerance = 1e-4f;
+
+        // The game adds trim to the pilot's stick, and the autopilot replaces the sum every step, so trim does
+        // nothing while engaged. Kept following the output, it is what holds the surfaces where the autopilot had
+        // them once it lets go; left alone, they snapped back to the old trim and the nose moved. The low-pass
+        // takes the steady deflection, not manoeuvres, and an axis the pilot is flying is left alone. The input
+        // handler hands this step's state in by reference and pushes it to the vessel, so the trim written here is
+        // the game's own.
+        private void offload_trim(in FlightCtrlState raw_in)
+        {
+            var k = trim_follow_time > 0.0f ? 1.0f - Mathf.Exp(-Time.fixedDeltaTime / trim_follow_time) : 1.0f;
+            if (Mathf.Abs(raw_in.pitch - raw_in.pitchTrim) < pilot_input_tolerance)
+                ctrl.pitchTrim = Mathf.Clamp(ctrl.pitchTrim + (ctrl.pitch - ctrl.pitchTrim) * k, -1.0f, 1.0f);
+            if (Mathf.Abs(raw_in.roll - raw_in.rollTrim) < pilot_input_tolerance)
+                ctrl.rollTrim = Mathf.Clamp(ctrl.rollTrim + (ctrl.roll - ctrl.rollTrim) * k, -1.0f, 1.0f);
+            if (Mathf.Abs(raw_in.yaw - raw_in.yawTrim) < pilot_input_tolerance)
+                ctrl.yawTrim = Mathf.Clamp(ctrl.yawTrim + (ctrl.yaw - ctrl.yawTrim) * k, -1.0f, 1.0f);
         }
 
         public void Dispose()

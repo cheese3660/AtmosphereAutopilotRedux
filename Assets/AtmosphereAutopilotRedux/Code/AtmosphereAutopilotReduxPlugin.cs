@@ -14,6 +14,8 @@ namespace AtmosphereAutopilotRedux
     /* Extend KerbalMod instead if you need the MonoBehaviour update loop/references to game stuff like SW 1.x mods */
     public class AtmosphereAutopilotReduxPlugin : GeneralMod
     {
+        internal const string AppButtonId = "BTN-AtmosphereAutopilot";
+
         private VisualTreeAsset _windowUxml;
         private Sprite _icon;
         private WindowController _controller;
@@ -28,6 +30,7 @@ namespace AtmosphereAutopilotRedux
         {
             SWConfiguration.Bind(this);
             Runtime.FlightRecorder.Configure(FlightRecorderEnabled);
+            Runtime.AutopilotSaves.Register();
 
             var handle = Addressables.LoadAssetAsync<VisualTreeAsset>(
                 "Assets/AtmosphereAutopilotRedux/UI/MainWindow/AtmosphereAutopilotWindow.uxml");
@@ -56,7 +59,7 @@ namespace AtmosphereAutopilotRedux
                 // Registered once here, not per campaign: Space Warp builds the flight app bar from its list
                 // whenever flight opens, and loading a save straight into flight can do that before our
                 // campaign callback runs. The list already hides the button while the mod is disabled.
-                Appbar.RegisterAppButton("Atmosphere Autopilot", "BTN-AtmosphereAutopilot", _icon,
+                Appbar.RegisterAppButton("Atmosphere Autopilot", AppButtonId, _icon,
                     on =>
                     {
                         if (_controller != null) _controller.isOpen = on;

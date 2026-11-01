@@ -74,6 +74,15 @@ namespace AtmosphereAutopilotRedux.MathUtils
                 updated_flag = false;
                 lock (tpars)
                 {
+                    // A fit that came out NaN or infinite keeps the last good coefficients, and training goes on
+                    // from those
+                    foreach (var value in tpars)
+                    {
+                        if (!double.IsNaN(value) && !double.IsInfinity(value))
+                            continue;
+                        pars.CopyTo(tpars, 0);
+                        return;
+                    }
                     tpars.CopyTo(pars, 0);
                 }
             }

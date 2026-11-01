@@ -185,9 +185,17 @@ namespace AtmosphereAutopilotRedux.MathUtils
                 // inputs
                 var input = imm_buf_inputs.GetWritingCell();
                 input_update_dlg(input);
+                var output = output_update_dlg();
+                // A sample that isn't a number is dropped before it reaches the fit: one taken on the first steps
+                // after a load turned the lift model to NaN for eight seconds, until it aged out of the buffers
+                if (double.IsNaN(output) || double.IsInfinity(output))
+                    return;
+                for (var i = 0; i < input_count; i++)
+                    if (double.IsNaN(input[i]) || double.IsInfinity(input[i]))
+                        return;
                 imm_buf_inputs.Put(input);
                 // outputs
-                imm_buf_outputs.Put(output_update_dlg());
+                imm_buf_outputs.Put(output);
             }
         }
 

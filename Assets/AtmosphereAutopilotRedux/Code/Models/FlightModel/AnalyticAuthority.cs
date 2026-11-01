@@ -5,6 +5,7 @@ using KSP.Modules;
 using KSP.OAB;
 using UnityEngine;
 
+using AtmosphereAutopilotRedux.MathUtils;
 using AtmosphereAutopilotRedux.Utils;
 
 namespace AtmosphereAutopilotRedux.Models
@@ -294,6 +295,87 @@ namespace AtmosphereAutopilotRedux.Models
             lift_query.refAirDensity = vessel.atmDensity;
             provider.OnCenterOfLiftQuery(lift_query);
             return lift_query.lift > 0.0f && !float.IsNaN(lift_query.lift);
+        }
+
+        // Wing lift along a world direction for an airflow, summed over the lift providers
+        private double probe_lift(Vector3 velocity, Vector3 direction)
+        {
+            var total = 0.0;
+            foreach (var provider in lift_providers)
+            {
+                if (provider is UnityEngine.Object unity_object && unity_object == null)
+                    continue;
+                if (!query_lift(provider, velocity))
+                    continue;
+                total += Vector3.Dot(lift_query.dir * lift_query.lift, direction);
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Whether the lift models were started from the game's lift instead of the seed.
+        /// </summary>
+        internal bool LiftSeededFromGame { get; private set; }
+
+        // The lift models start from the game's own lift at the current airflow: its slope from the airflow tilted by
+        // stiffness_probe_angle either way, and the lift at zero AoA from the current one. The seed had no slope
+        // and a surface lift of one vessel mass, and the first engage at Mach 3 asked for a quarter radian of AoA.
+        // The surfaces' share is in the probed lift at their current deflection, so the surface term starts at zero
+        // and is learned as they move.
+        private bool seed_lift_from_probe()
+        {
+            Vector3 v = surface_v;
+            if (lift_providers.Count == 0 || dyn_pressure < 60.0 || v.sqrMagnitude < 1.0f)
+                return false;
+            var t = vessel.ReferenceTransform;
+            var up = t.up;
+            var fwd = t.forward;
+            var right = t.right;
+            var k = Mathf.Tan(stiffness_probe_angle);
+            var speed = v.magnitude;
+            var dir = v / speed;
+            Vector3 pitch_dir = pitch_tangent;
+            Vector3 yaw_dir = yaw_tangent;
+
+            // In the regression's units: force / dyn_pressure * 1e3, as the lift output methods measure it
+            var scale = 1e3 / dyn_pressure;
+            var seeded = false;
+
+            var v_pitch_up = (dir + k * fwd).normalized * speed;
+            var v_pitch_dn = (dir - k * fwd).normalized * speed;
+            var d_aoa = probe_aoa(v_pitch_up, up, fwd) - probe_aoa(v_pitch_dn, up, fwd);
+            var slope = (probe_lift(v_pitch_up, pitch_dir) - probe_lift(v_pitch_dn, pitch_dir)) / d_aoa;
+            // The lift validator only accepts lift that grows with AoA
+            if (!double.IsNaN(slope) && !double.IsInfinity(slope) && slope > 0.0)
+            {
+                var lift_zero = probe_lift(v, pitch_dir) - slope * AoA(PITCH);
+                set_lift_seed(pitch_lift_model, lift_zero * scale, slope * scale);
+                seeded = true;
+            }
+
+            var v_yaw_up = (dir - k * right).normalized * speed;
+            var v_yaw_dn = (dir + k * right).normalized * speed;
+            var d_slip = probe_aoa(v_yaw_up, up, -right) - probe_aoa(v_yaw_dn, up, -right);
+            var side_slope = (probe_lift(v_yaw_up, yaw_dir) - probe_lift(v_yaw_dn, yaw_dir)) / d_slip;
+            if (!double.IsNaN(side_slope) && !double.IsInfinity(side_slope) && side_slope > 0.0)
+            {
+                set_lift_seed(yaw_lift_model, 0.0, side_slope * scale);
+                seeded = true;
+            }
+            LiftSeededFromGame |= seeded;
+            return seeded;
+        }
+
+        private static void set_lift_seed(LinApprox model, double constant, double aoa_slope)
+        {
+            lock (model.tpars)
+            {
+                model.tpars[0] = constant;
+                model.tpars[1] = aoa_slope;
+                model.tpars[2] = 0.0;
+                model.tpars.CopyTo(model.pars, 0);
+            }
+            model.signalUpdated();
         }
 
         #endregion

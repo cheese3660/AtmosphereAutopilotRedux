@@ -47,6 +47,9 @@ namespace AtmosphereAutopilotRedux.Runtime
             s.pitch = pitch;
             s.roll = roll;
             s.yaw = yaw;
+            s.pitchTrim = pitchTrim;
+            s.rollTrim = rollTrim;
+            s.yawTrim = yawTrim;
             s.mainThrottle = mainThrottle;
         }
     }

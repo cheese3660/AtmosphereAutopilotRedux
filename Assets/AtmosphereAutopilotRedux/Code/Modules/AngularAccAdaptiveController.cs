@@ -235,6 +235,7 @@ namespace AtmosphereAutopilotRedux.Modules
         private const double indi_scale_prior = 1e-3;
 
         private double indi_sxx, indi_sxy;
+        private double indi_prev_x = double.NaN, indi_prev_y = double.NaN;
         private double indi_scale_fit = 1.0;
         private double indi_scale = 1.0;
 
@@ -255,12 +256,27 @@ namespace AtmosphereAutopilotRedux.Modules
         /// </summary>
         internal double IndiAuthority => IndiActive ? indi_surface_authority() * imodel.AngularDampingFactor : double.NaN;
 
+        // Scale an engage starts from: 1, or the one saved with the vessel
+        private double indi_scale_start = 1.0;
+
+        /// <summary>
+        /// Starts the authority scale from a saved value on the next engage, and now.
+        /// </summary>
+        internal void RestoreIndiScale(double scale)
+        {
+            if (double.IsNaN(scale) || double.IsInfinity(scale))
+                return;
+            indi_scale_start = Common.Clamp(scale, indi_scale_min, indi_scale_max);
+            reset_indi_scale();
+        }
+
         private void reset_indi_scale()
         {
             indi_sxx = indi_scale_prior;
-            indi_sxy = indi_scale_prior;
-            indi_scale_fit = 1.0;
-            indi_scale = 1.0;
+            indi_sxy = indi_scale_prior * indi_scale_start;
+            indi_scale_fit = indi_scale_start;
+            indi_scale = indi_scale_start;
+            indi_prev_x = indi_prev_y = double.NaN;
         }
 
         // The game's surface authority is right at low speed but runs ahead of the real one with Mach, by three to
@@ -276,11 +292,12 @@ namespace AtmosphereAutopilotRedux.Modules
         {
             if (!indi_control)
                 return;
-            if (!indi_off_ground())
+            if (!indi_off_ground(indi_scale_liftoff_time))
             {
                 // Start the fit afresh from the current scale once airborne, so nothing from the ground lingers
                 indi_sxx = indi_scale_prior;
                 indi_sxy = indi_scale_prior * indi_scale;
+                indi_prev_x = indi_prev_y = double.NaN;
                 indi_scale_fit = indi_scale;
                 return;
             }
@@ -299,6 +316,16 @@ namespace AtmosphereAutopilotRedux.Modules
                 imodel.IndiDirectAuthority(axis) * second_difference(input, 1);
             if (double.IsNaN(x) || double.IsNaN(y) || double.IsInfinity(x) || double.IsInfinity(y))
                 return;
+            // Summed over two steps, so a surface that flips every step drops out. At that rate one step of lag
+            // turns the response's sign, and a step-to-step chatter just after liftoff fitted to the floor.
+            var x_pair = x + indi_prev_x;
+            var y_pair = y + indi_prev_y;
+            indi_prev_x = x;
+            indi_prev_y = y;
+            if (double.IsNaN(x_pair) || double.IsNaN(y_pair))
+                return;
+            x = x_pair;
+            y = y_pair;
             var forget = Math.Exp(-Time.fixedDeltaTime / indi_scale_forget_time);
             indi_sxx = forget * indi_sxx + x * x;
             indi_sxy = forget * indi_sxy + x * y;
@@ -309,20 +336,23 @@ namespace AtmosphereAutopilotRedux.Modules
         }
 
         /// <summary>
-        /// Time after the last ground contact, s, before incremental control and its authority fit trust the
-        /// measured acceleration. The differences it works from reach a few steps back, and on a bouncing takeoff
+        /// Time after the last ground contact, s, before incremental control trusts the measured acceleration. It
+        /// looks back two steps, so a few steps clear the wheel forces; any longer hands control to the fallback
+        /// law, which chattered step to step just after liftoff.
+        /// </summary>
+        public float indi_liftoff_settle_time = 0.1f;
+
+        /// <summary>
+        /// Time after the last ground contact, s, before the authority fit takes samples. On a bouncing takeoff
         /// one sample spanning a wheel strike pulled the yaw and roll scale to its floor.
         /// </summary>
-        public float indi_liftoff_settle_time = 0.5f;
+        public float indi_scale_liftoff_time = 0.5f;
 
-        private double indi_last_ground_time = double.NegativeInfinity;
-
-        private bool indi_off_ground()
+        // Ground contact is tracked by the flight model: cruise and fly-by-wire don't run this controller on the
+        // ground, so tracking it here never saw the ground and let incremental control in on the first airborne step
+        private bool indi_off_ground(float settle_time)
         {
-            var now = Time.fixedTimeAsDouble;
-            if (vessel.LandedOrSplashed())
-                indi_last_ground_time = now;
-            return now - indi_last_ground_time >= indi_liftoff_settle_time;
+            return !vessel.LandedOrSplashed() && imodel.SecondsSinceGround >= settle_time;
         }
 
         // Change of the step ending shift entries back from the newest
@@ -367,7 +397,7 @@ namespace AtmosphereAutopilotRedux.Modules
         protected double indi_next_torque_acc()
         {
             // On the ground the measured acceleration carries wheel and ground forces no surface accounts for
-            if (!indi_control || !indi_off_ground())
+            if (!indi_control || !indi_off_ground(indi_liftoff_settle_time))
                 return double.NaN;
             var surface_authority = indi_surface_authority();
             if (double.IsNaN(surface_authority) || surface_authority <= 0.0)

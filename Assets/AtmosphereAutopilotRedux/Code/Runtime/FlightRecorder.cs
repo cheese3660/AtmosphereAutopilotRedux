@@ -280,6 +280,8 @@ namespace AtmosphereAutopilotRedux.Runtime
             Flag("t_on", tc.spd_control_enabled);
             Col("t_set", tc.setpoint_mps);
             Col("t_env", tc.DebugEnvelopeSpeed);
+            Col("t_vref", tc.SpeedReference);
+            Col("t_energy_acc", tc.debug_energy_acc);
             Col("d_vert_int", context.Director.DebugVertIntegral);
             Col("t_da", tc.DebugDesiredAcc);
             Col("t_a", tc.debug_current_acc);
@@ -307,6 +309,8 @@ namespace AtmosphereAutopilotRedux.Runtime
             Col("c_vs_cmd", cc.debug_cmd_vert_speed);
             Col("c_vs_max", cc.debug_max_vert_speed);
             Col("c_climb_ang", cc.debug_max_climb_angle);
+            Col("c_speed_w", cc.debug_speed_weight);
+            Col("c_balance_vs", cc.debug_balance_vs);
             Col("c_relax_k", cc.debug_relax_k);
             Flag("c_apply_acc", cc.debug_apply_acc);
             Col("c_vert_acc", Vector3d.Dot(cc.DebugDesiredVertAcc, up));

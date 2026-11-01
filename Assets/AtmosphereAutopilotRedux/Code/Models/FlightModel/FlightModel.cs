@@ -178,6 +178,14 @@ namespace AtmosphereAutopilotRedux.Models
         }
 
         internal bool sequential_dt = false;
+
+        private double last_ground_time = double.NegativeInfinity;
+
+        /// <summary>
+        /// Seconds since the vessel last touched the ground or water, tracked every physics step. The controllers
+        /// that care don't run on the ground, so they can't keep track of it themselves.
+        /// </summary>
+        public double SecondsSinceGround => Time.fixedTimeAsDouble - last_ground_time;
         private Transform reference_transform_parent = null;
 
         /// <summary>
@@ -191,6 +199,9 @@ namespace AtmosphereAutopilotRedux.Models
                 sequential_dt = false;
             reference_transform_parent = cntrl_parent;
 
+            if (vessel.LandedOrSplashed())
+                last_ground_time = Time.fixedTimeAsDouble;
+
             update_moments();
             if (!lin_models_seeded)
                 seed_lin_models();
@@ -201,6 +212,9 @@ namespace AtmosphereAutopilotRedux.Models
             update_dynamics();
             update_analytic_authority();
             update_analytic_stiffness();
+            // An engage with nothing learned or restored starts the lift models from the game's lift
+            if (Active && !HasLearned && !LiftSeededFromGame && !vessel.LandedOrSplashed())
+                seed_lift_from_probe();
 
             if (sequential_dt)
             {

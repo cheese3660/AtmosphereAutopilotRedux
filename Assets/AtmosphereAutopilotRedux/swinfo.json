@@ -5,7 +5,7 @@
   "author": "Infinity Irrealis (Port) & Boris Barboris (Original)",
   "description": "A port of the Atmosphere Autopilot KSP1 Mod to KSP2 Redux (GPL-3 Licensed)",
   "source": "",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "version_check": "https://raw.githubusercontent.com/cheese3660/AtmosphereAutopilotRedux/refs/heads/main/Assets/AtmosphereAutopilotRedux/swinfo.json",
   "addressable_script_label": "AtmosphereAutopilotRedux_patches",
   "addressable_prefab_patch_label": "AtmosphereAutopilotRedux_prefab_patches",

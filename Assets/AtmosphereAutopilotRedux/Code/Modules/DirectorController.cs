@@ -76,6 +76,8 @@ namespace AtmosphereAutopilotRedux.Modules
             turn_limit_frac = 1.0;
             vert_integral = 0.0;
             turn_error_filter_reset = true;
+            held_pitch_rate = double.NaN;
+            held_yaw_rate = double.NaN;
             // save moderation states
             aoa_moderation_saved = pitch_c.moderate_aoa;
             sideslip_moderation_saved = yaw_c.moderate_aoa;
@@ -119,6 +121,13 @@ namespace AtmosphereAutopilotRedux.Modules
         private bool turn_error_filter_reset = true;
 
         /// <summary>
+        /// Time constant, s, of the low-pass on the turn rate that the equilibrium AoA balances PhysX damping for.
+        /// </summary>
+        public double held_rate_filter_time = 2.0;
+
+        private double held_pitch_rate = double.NaN, held_yaw_rate = double.NaN;
+
+        /// <summary>
         /// Time constant, s, of vertical velocity tracking.
         /// </summary>
         public double vert_time = 1.0;
@@ -131,7 +140,7 @@ namespace AtmosphereAutopilotRedux.Modules
         /// <summary>
         /// Largest acceleration the vertical integral adds, m/s^2.
         /// </summary>
-        public double vert_integral_limit = 2.0;
+        public double vert_integral_limit = 5.0;
 
         /// <summary>
         /// Vertical speed error, m/s, beyond which the vertical integral holds still.
@@ -312,10 +321,18 @@ namespace AtmosphereAutopilotRedux.Modules
             var target_lift_acc = target_acc + neutral_acc;
             var target_normal_lift_acc = target_lift_acc - Vector3d.Project(target_lift_acc, imodel.surface_v);
 
-            // prevent rolling on small errors
-            if (angular_error < 2e-2 && target_normal_lift_acc.magnitude < neutral_acc.magnitude * 0.3)
+            // Prevent rolling on small errors when little lift is wanted: the bank angle is the lateral demand over
+            // the lift, so in a pushover a 0.2 m/s^2 heading correction asked for 8 degrees. Upstream dropped the
+            // lateral part outright below 0.3 g with the velocity within 0.02 rad of its target, which stepped the
+            // bank target by all of that whenever either crossed. It fades out instead, over 0.3 to 0.6 g of lift
+            // and 0.02 to 0.04 rad of error, keeping whichever asks for more of it.
+            var lift_g = target_normal_lift_acc.magnitude / Math.Max(1e-3, neutral_acc.magnitude);
+            var lateral_weight = Math.Max(Common.Clamp((lift_g - 0.3) / 0.3, 0.0, 1.0),
+                Common.Clamp((angular_error - 2e-2) / 2e-2, 0.0, 1.0));
+            if (lateral_weight < 1.0)
             {
-                target_lift_acc = Vector3d.Project(target_lift_acc, neutral_acc);
+                var vertical_lift_acc = Vector3d.Project(target_lift_acc, neutral_acc);
+                target_lift_acc = vertical_lift_acc + (target_lift_acc - vertical_lift_acc) * lateral_weight;
                 target_normal_lift_acc = target_lift_acc - Vector3d.Project(target_lift_acc, imodel.surface_v);
             }
 
@@ -351,7 +368,8 @@ namespace AtmosphereAutopilotRedux.Modules
             desired_pitch_acc = desired_pitch_lift + imodel.pitch_gravity_acc + imodel.pitch_noninert_acc;
             desired_pitch_v = desired_pitch_acc / imodel.surface_v_magnitude;
             // let's find equilibrium AoA for desired lift
-            desired_aoa = get_desired_aoa(imodel.pitch_rot_model_gen, desired_pitch_v, 0.0);
+            held_pitch_rate = filter_held_rate(held_pitch_rate, desired_pitch_v);
+            desired_aoa = get_desired_aoa(imodel.pitch_rot_model_gen, desired_pitch_v, 0.0, held_pitch_rate);
             // The balance with the moment equation can go near singular while the learned moment terms move,
             // and then asks for tenths of a radian out of nowhere. Lift alone, with the surfaces at their trim,
             // says roughly where the AoA has to be, so a solution far from that is not trusted. The trim is the
@@ -383,7 +401,8 @@ namespace AtmosphereAutopilotRedux.Modules
             desired_yaw_v = desired_yaw_acc / imodel.surface_v_magnitude;
             // let's find equilibrium sideslip for desired lift
             //if (Math.Abs(desired_yaw_lift) < 0.01f)
-            desired_sideslip = (float)Common.simple_filter(get_desired_aoa(imodel.yaw_rot_model_gen, desired_yaw_v, 0.0), desired_sideslip, sideslip_filter_k);
+            held_yaw_rate = filter_held_rate(held_yaw_rate, desired_yaw_v);
+            desired_sideslip = (float)Common.simple_filter(get_desired_aoa(imodel.yaw_rot_model_gen, desired_yaw_v, 0.0, held_yaw_rate), desired_sideslip, sideslip_filter_k);
             if (float.IsNaN(desired_sideslip) || float.IsInfinity(desired_sideslip) || Math.Abs(desired_sideslip) < 0.001f)
                 desired_sideslip = 0.0f;
             desired_sideslip = 0.0f;
@@ -578,14 +597,32 @@ namespace AtmosphereAutopilotRedux.Modules
         private Matrix aoa_B = new Matrix(2, 1);
         private Matrix eq_x;
 
-        public float get_desired_aoa(LinearSystemModel rotation_model, double desired_v, double desired_aoa_deriv)
+        // The low-passed turn rate for the damping term in get_desired_aoa. NaN starts it from the current rate.
+        private double filter_held_rate(double held, double rate)
+        {
+            if (double.IsNaN(held) || held_rate_filter_time <= 0.0)
+                return rate;
+            return held + (rate - held) * (1.0 - Math.Exp(-Time.fixedDeltaTime / held_rate_filter_time));
+        }
+
+        public float get_desired_aoa(LinearSystemModel rotation_model, double desired_v, double desired_aoa_deriv,
+            double held_v)
         {
             aoa_A[0, 0] = rotation_model.A[0, 0];
             aoa_A[0, 1] = rotation_model.A[0, 2] + rotation_model.A[0, 3] + rotation_model.B[0, 0];
             aoa_A[1, 0] = rotation_model.A[1, 0];
             aoa_A[1, 1] = rotation_model.A[1, 2] + rotation_model.A[1, 3] + rotation_model.B[1, 0];
             aoa_B[0, 0] = desired_aoa_deriv - desired_v - rotation_model.C[0, 0];
-            aoa_B[1, 0] = -rotation_model.C[1, 0];
+            // Turning at desired_v takes torque against PhysX damping, which takes (1 - f) of the rate every step:
+            // w = f * (w + torque_acc * dt) holds w only with torque_acc = w * (1 - f) / (f * dt). The moment row is
+            // in torque acceleration, so that is what it has to balance to. Following the planet's curve at Mach 4
+            // near sea level that is about 1 rad/s^2, and the surface deflection that supplies it adds lift the
+            // equilibrium otherwise doesn't expect; the craft held altitude only because the doubled curvature term
+            // happened to cancel it at 500 m. The rate is the low-passed one, held_v: the gain (1 - f) / (f * dt) is
+            // about 400 near the speed limit, and with the raw rate it carried every vertical speed correction into
+            // the AoA and set pitch oscillating there. The steady turn is all that needs the torque.
+            var f = Math.Max(FlightModel.MinAngularDampingFactor, imodel.AngularDampingFactor);
+            aoa_B[1, 0] = held_v * (1.0 - f) / (f * Time.fixedDeltaTime) - rotation_model.C[1, 0];
             aoa_A.old_lu = true;
             try
             {
@@ -601,7 +638,6 @@ namespace AtmosphereAutopilotRedux.Modules
         /// radians.
         /// </summary>
         public float max_aoa_disagreement = 0.02f;
-
         /// <summary>
         /// Time constant of the surface and gimbal trim the lift-only AoA uses, s.
         /// </summary>

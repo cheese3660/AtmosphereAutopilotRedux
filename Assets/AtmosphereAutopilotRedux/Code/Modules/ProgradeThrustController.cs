@@ -61,6 +61,9 @@ namespace AtmosphereAutopilotRedux.Modules
             imodel.Activate();
             v_integral = 0.0;
             filtered_acc = double.NaN;
+            speed_reference = double.NaN;
+            speed_reference_acc = 0.0;
+            commanded_vertical_speed = double.NaN;
         }
 
         protected override void OnDeactivate()
@@ -145,6 +148,7 @@ namespace AtmosphereAutopilotRedux.Modules
         public override float ApplyControl(AACtrlState cntrl, float target_value)
         {
             current_v = imodel.surface_v_magnitude;
+            setpoint_target = target_value;
             desired_v = apply_damping_limit(target_value);
 
             // apply breaks if needed
@@ -210,7 +214,11 @@ namespace AtmosphereAutopilotRedux.Modules
                 current_acc = filtered_acc;
                 drag_estimate = current_acc - prograde_thrust / imodel.sum_mass - Vector3d.Dot(imodel.gravity_acc + imodel.noninert_acc, surfspd_dir);
 
-                v_error = desired_v - current_v;
+                // Total energy control: the throttle follows a speed reference the engines can deliver, and the
+                // climb or descent the cruise controller commands, so thrust moves with the flight path command
+                // instead of after the speed has gone
+                update_speed_reference();
+                v_error = speed_reference - current_v;
                 if (Math.Abs(v_error) > integral_band)
                     v_integral = 0.0;
                 else
@@ -222,7 +230,19 @@ namespace AtmosphereAutopilotRedux.Modules
                     if (Ki_v > 0.0)
                         v_integral = Common.Clamp(v_integral, integral_limit / Ki_v);
                 }
-                desired_acc = Kp_v * v_error + Ki_v * v_integral;
+                desired_acc = speed_reference_acc + Kp_v * v_error + Ki_v * v_integral;
+                // Energy rate the flight path command adds or takes, g * (sin gamma_c - sin gamma), against the
+                // gravity share the measured acceleration already carries
+                var commanded_vs = commanded_vertical_speed;
+                commanded_vertical_speed = double.NaN;      // one step only, so a stale command can't linger
+                debug_energy_acc = 0.0;
+                if (!double.IsNaN(commanded_vs) && current_v > 1.0)
+                {
+                    var up = (vessel.ReferenceTransform.position - vessel.mainBody.position).normalized;
+                    var vs = Vector3d.Dot(imodel.surface_v, up);
+                    debug_energy_acc = imodel.gravity_acc.magnitude * (commanded_vs - vs) / current_v;
+                    desired_acc += debug_energy_acc;
+                }
                 if (Math.Abs(desired_acc - current_acc) < relaxation_acc_error)
                 {
                     // we're on low error regime, let's smooth out acceleration error using exponential moving average
@@ -245,6 +265,129 @@ namespace AtmosphereAutopilotRedux.Modules
         }
 
         public double estimated_max_thrust = 0.0;
+
+        #region Speed reference
+
+        // The speed the throttle chases moves toward the target only as fast as the engines can follow, the way
+        // the cruise altitude profile moves only as fast as lift allows. Chased directly, a 400 m/s setpoint step
+        // asked for 200 m/s^2, and the energy balance in pitch read the shortfall as a reason to dive.
+
+        /// <summary>
+        /// Share of the thrust margin (or of the drag, slowing down) the speed reference accelerates with.
+        /// </summary>
+        public double reference_acc_share = 0.7;
+
+        /// <summary>
+        /// Fastest change of the reference's acceleration, g per second. The engines' spool rate caps it further.
+        /// </summary>
+        public double reference_jerk_g = 0.5;
+
+        /// <summary>
+        /// Time constant, s, the reference settles onto the target with once close to it.
+        /// </summary>
+        public double reference_settle_time = 2.0;
+
+        /// <summary>
+        /// Vertical speed the cruise controller commands this step, m/s, for the energy rate term. NaN when no flight
+        /// path is commanded; read once and cleared.
+        /// </summary>
+        internal double commanded_vertical_speed = double.NaN;
+
+        private double speed_reference = double.NaN;
+        private float setpoint_target;
+        private double speed_reference_acc;
+
+        /// <summary>
+        /// Speed the throttle is chasing now, m/s.
+        /// </summary>
+        internal double SpeedReference => speed_reference;
+
+        /// <summary>
+        /// Whether the wanted throttle sits at full, or at idle.
+        /// </summary>
+        internal bool ThrottleAtFull => last_throttle >= 0.999f;
+        internal bool ThrottleAtIdle => last_throttle <= 0.001f;
+
+        internal double debug_energy_acc;
+
+        private void update_speed_reference()
+        {
+            var dt = Time.fixedDeltaTime;
+            if (double.IsNaN(speed_reference))
+            {
+                speed_reference = current_v;
+                speed_reference_acc = 0.0;
+            }
+            var mass = Math.Max(1e-3, imodel.sum_mass);
+            var max_thrust = 0.0;
+            for (var i = 0; i < imodel.engines.Count; i++)
+                max_thrust += imodel.engines[i].estimated_max_thrust;
+            // Flight path the thrust also has to pay for; drag_estimate is negative
+            var g = imodel.gravity_acc.magnitude;
+            var sin_gamma = 0.0;
+            if (!double.IsNaN(commanded_vertical_speed) && current_v > 1.0)
+                sin_gamma = Common.Clamp(commanded_vertical_speed / current_v, 1.0);
+            var acc_up = Math.Max(0.0, reference_acc_share * (max_thrust / mass + drag_estimate - g * sin_gamma));
+            var acc_down = Math.Max(0.0, reference_acc_share * (-drag_estimate + g * sin_gamma));
+            // Engines spool at k of the remaining throttle per second, so thrust changes no faster than that
+            var jerk_cap = reference_jerk_g * g;
+            var jerk_up = jerk_cap;
+            var jerk_down = jerk_cap;
+            if (spool_state(true, out var rate_up, out var cur_up))
+                jerk_up = Math.Min(jerk_cap, Math.Max(0.05, reference_acc_share * rate_up * (1.0 - cur_up) * max_thrust / mass));
+            if (spool_state(false, out var rate_down, out var cur_down))
+                jerk_down = Math.Min(jerk_cap, Math.Max(0.05, reference_acc_share * rate_down * cur_down * max_thrust / mass));
+            // The damping speed limit protects control authority, so the reference doesn't ease down to it
+            if (desired_v < setpoint_target && speed_reference > desired_v)
+            {
+                speed_reference = desired_v;
+                speed_reference_acc = Math.Min(0.0, speed_reference_acc);
+            }
+            var error = desired_v - speed_reference;
+            var limit = error > 0.0 ? acc_up : acc_down;
+            var ease_jerk = Math.Min(jerk_up, jerk_down);
+            var wanted = Math.Min(limit, Math.Sqrt(2.0 * ease_jerk * Math.Abs(error)));
+            if (reference_settle_time > 0.0)
+                wanted = Math.Min(wanted, Math.Abs(error) / reference_settle_time);
+            wanted *= Math.Sign(error);
+            speed_reference_acc += Common.Clamp(wanted - speed_reference_acc, -jerk_down * dt, jerk_up * dt);
+            speed_reference += speed_reference_acc * dt;
+            // Out of margin the reference stays with the vessel, so pitch never trades height for speed the engines
+            // can't hold
+            if (acc_up <= 0.0 && speed_reference > current_v)
+            {
+                speed_reference = current_v;
+                speed_reference_acc = Math.Min(0.0, speed_reference_acc);
+            }
+            if (acc_down <= 0.0 && speed_reference < current_v)
+            {
+                speed_reference = current_v;
+                speed_reference_acc = Math.Max(0.0, speed_reference_acc);
+            }
+        }
+
+        // Spool rate of the slowest response-time engine for raising (or lowering) thrust, and its throttle
+        private bool spool_state(bool raising, out double rate, out double current)
+        {
+            rate = double.PositiveInfinity;
+            current = 0.0;
+            for (var i = 0; i < imodel.engines.Count; i++)
+            {
+                var mode = imodel.engines[i].Mode;
+                var data = imodel.engines[i].Data;
+                if (mode == null || data == null || !mode.useEngineResponseTime)
+                    continue;
+                var r = raising ? mode.engineAccelerationSpeed : mode.engineDecelerationSpeed;
+                if (r < rate)
+                {
+                    rate = r;
+                    current = data.currentThrottle;
+                }
+            }
+            return !double.IsInfinity(rate) && rate > 0.0;
+        }
+
+        #endregion
 
         /// <summary>
         /// Throttle that gives the required thrust once the engines have spooled to it.

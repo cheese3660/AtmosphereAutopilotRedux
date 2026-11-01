@@ -68,6 +68,68 @@ namespace AtmosphereAutopilotRedux.Models
 
         private bool lin_models_seeded = false;
 
+        #region Persistence
+
+        // The learned models, in the order they are saved. A new order needs a new save format.
+        private LinApprox[] persisted_models => new[]
+        {
+            pitch_aero_torque_model, pitch_aero_torque_model_gen,
+            roll_aero_torque_model, roll_aero_torque_model_gen,
+            yaw_aero_torque_model, yaw_aero_torque_model_gen,
+            pitch_lift_model, yaw_lift_model,
+        };
+
+        /// <summary>
+        /// Whether the models hold something learned (or restored), not just the seed.
+        /// </summary>
+        internal bool HasLearned { get; private set; }
+
+        /// <summary>
+        /// Copies of the learned model coefficients, for the save.
+        /// </summary>
+        internal double[][] ExportModels()
+        {
+            var models = persisted_models;
+            var result = new double[models.Length][];
+            for (var i = 0; i < models.Length; i++)
+                lock (models[i].tpars)
+                    result[i] = (double[])models[i].tpars.Clone();
+            return result;
+        }
+
+        /// <summary>
+        /// Starts the models from saved coefficients instead of the seed, which after a load asked for a quarter radian
+        /// of AoA at Mach 3: its lift slope is zero. False, changing nothing, when the data doesn't fit.
+        /// </summary>
+        internal bool ImportModels(double[][] data)
+        {
+            var models = persisted_models;
+            if (data == null || data.Length != models.Length)
+                return false;
+            for (var i = 0; i < models.Length; i++)
+            {
+                if (data[i] == null || data[i].Length != models[i].tpars.Length)
+                    return false;
+                foreach (var value in data[i])
+                    if (double.IsNaN(value) || double.IsInfinity(value))
+                        return false;
+            }
+            for (var i = 0; i < models.Length; i++)
+            {
+                lock (models[i].tpars)
+                {
+                    data[i].CopyTo(models[i].tpars, 0);
+                    data[i].CopyTo(models[i].pars, 0);
+                }
+                models[i].signalUpdated();
+            }
+            lin_models_seeded = true;
+            HasLearned = true;
+            return true;
+        }
+
+        #endregion
+
         // Initial dumb aero values. Upstream did this in the constructor, before control surfaces and mass were known,
         // and never signalled the models, so the seed never took effect. We seed after the first full parts scan.
         private void seed_lin_models()
@@ -366,6 +428,8 @@ namespace AtmosphereAutopilotRedux.Models
             var dt = (int)Math.Max(1, Math.Round(Time.fixedDeltaTime * 100.0f));
             if (!vessel.LandedOrSplashed() && dyn_pressure >= 60.0 && csurf_buf[PITCH].Size > aero_delay_steps)
             {
+                // Trained in flight from here on, so not the seed any more
+                HasLearned = true;
                 pitch_trainer.UpdateState(dt);
                 pitch_trainer.min_output_value = (float)(0.5 * MOI[PITCH] / dyn_pressure * 1e2);
 

@@ -109,6 +109,12 @@ namespace AtmosphereAutopilotRedux.Modules
         // [AutoGuiAttr("cubic_barrier", true, "G6")]
         protected float cubic_barrier = 1.0f;
 
+        /// <summary>
+        /// Largest angle-to-rate gain under incremental control, as a share of the rate loop's bandwidth
+        /// (1 / indi_rate_time). Zero leaves the gain alone and also keeps upstream's step at the cubic switch.
+        /// </summary>
+        protected float indi_rate_gain_share = 0.0f;
+
         // [AutoGuiAttr("cubic_KP", true, "G6")]
         protected float cubic_kp = 0.2f;
 
@@ -209,6 +215,23 @@ namespace AtmosphereAutopilotRedux.Modules
                 }
             }
 
+            if (indi_rate_gain_share > 0.0f)
+            {
+                // The cubic law is steeper than the relaxation slope just outside it, a step from 12.5 to 26 per
+                // second at about 0.1 degrees of sideslip that locked a yaw oscillation in once it started, so it
+                // is held to that slope. Under incremental control the gain also stays well under the rate loop's
+                // bandwidth: rudder side force moves sideslip directly, PhysX damping doesn't touch it, and the
+                // deflection per unit rate error grows as 1 / damping factor, so near the speed limit a gain of
+                // 12.5 became a 3.6 Hz limit cycle at full rudder.
+                var max_gain = double.PositiveInfinity;
+                if (cubic)
+                    max_gain = relaxation_factor / Math.Max(relaxation_frame * Time.fixedDeltaTime, Time.fixedDeltaTime);
+                if (v_controller.IndiActive && v_controller.indi_rate_time > 0.0f)
+                    max_gain = Math.Min(max_gain, indi_rate_gain_share / v_controller.indi_rate_time);
+                if (!double.IsInfinity(max_gain))
+                    descend_v = Common.Clamp(descend_v, max_gain * Math.Abs(error));
+            }
+
             if (stable_out_of_bounds)
                 descend_v = -0.2 * descend_v;
 
@@ -242,7 +265,12 @@ namespace AtmosphereAutopilotRedux.Modules
     public sealed class SideslipController : AoAController
     {
         internal SideslipController(AAVessel v) :
-            base(v, "Sideslip controller", YAW) { }
+            base(v, "Sideslip controller", YAW)
+        {
+            // Yaw only: pitch's AoA loop holds up at the speed limit. Half the rate loop's bandwidth, 5 per second,
+            // stays stable in simulation to a damping of 0.97 per step.
+            indi_rate_gain_share = 0.5f;
+        }
     }
 
     public sealed class PitchAoAController : AoAController

@@ -182,6 +182,11 @@ namespace AtmosphereAutopilotRedux.Modules
         internal float DebugOutputAcc => output_acc;
         internal AngularAccAdaptiveController DebugAccController => acc_controller;
 
+        /// <summary>
+        /// Whether the acceleration controller ran incremental control on its last step.
+        /// </summary>
+        internal bool IndiActive => acc_controller != null && acc_controller.IndiActive;
+
     }
 
 

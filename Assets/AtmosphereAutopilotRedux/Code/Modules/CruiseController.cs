@@ -75,9 +75,6 @@ namespace AtmosphereAutopilotRedux.Modules
         private Vector3d planet2vesNorm = Vector3d.zero;
         private Vector3d desired_vert_acc = Vector3d.zero;
 
-        // centrifugal acceleration to stay on desired altitude
-        private Vector3d level_acc = Vector3d.zero;
-
         public override void ApplyControl(AACtrlState cntrl)
         {
             if (vessel.LandedOrSplashed())
@@ -90,9 +87,9 @@ namespace AtmosphereAutopilotRedux.Modules
             planet2ves = vessel.ReferenceTransform.position - vessel.mainBody.position;
             planet2vesNorm = planet2ves.normalized;
             desired_vert_acc = Vector3d.zero;
-
-            // centrifugal acceleration to stay on desired altitude
-            level_acc = -planet2vesNorm * (imodel.surface_v - Vector3d.Project(imodel.surface_v, planet2vesNorm)).sqrMagnitude / planet2ves.magnitude;
+            // The centripetal acceleration that keeps altitude along the planet's curve is the director's own term.
+            // Upstream added it here too, and with the director's on top it was counted twice: 3.4 m/s^2 short of
+            // lift at Mach 4, which the vertical integral had to make up.
 
             switch (current_mode)
             {
@@ -170,7 +167,7 @@ namespace AtmosphereAutopilotRedux.Modules
             dir_c.strength *= strength_mult;
             // The director's vertical integral is for steady error; hold it while the altitude profile is moving
             dir_c.hold_vert_integral = desired_vert_acc.magnitude > vert_integral_settled_acc;
-            dir_c.ApplyControl(cntrl, desired_velocity, level_acc + desired_vert_acc);
+            dir_c.ApplyControl(cntrl, desired_velocity, desired_vert_acc);
             dir_c.hold_vert_integral = false;
             dir_c.strength = old_str;
         }
@@ -241,10 +238,6 @@ namespace AtmosphereAutopilotRedux.Modules
         /// </summary>
         public double desired_vertsetpoint = 0.0;
 
-        public bool pseudo_flc = true;
-
-        public double flc_margin = 20.0;
-
         public double strength_mult = 0.75;
 
         /// <summary>
@@ -255,15 +248,10 @@ namespace AtmosphereAutopilotRedux.Modules
         public double max_climb_angle = 30.0;
 
         /// <summary>
-        /// Shallowest climb or dive angle, degrees, while an altitude change is under way, so speed hold can slow an
-        /// altitude change but never stall it.
+        /// Shallowest climb or dive angle, degrees, while an altitude change is under way, so the energy balance can
+        /// slow an altitude change but never stall it.
         /// </summary>
         public double min_climb_angle = 2.0;
-
-        /// <summary>
-        /// Fraction of the sustainable climb (or idle dive) angle kept when far off the speed target.
-        /// </summary>
-        public double climb_angle_floor = 0.25;
 
         /// <summary>
         /// How fast the allowed climb or dive angle may change, degrees per second.
@@ -335,6 +323,7 @@ namespace AtmosphereAutopilotRedux.Modules
         private Vector3d account_for_vertical_vel(Vector3d desired_direction)
         {
             var res = desired_direction.normalized * vessel.horizontalSrfSpeed + planet2vesNorm * desired_vertsetpoint;
+            thrust_c.commanded_vertical_speed = desired_vertsetpoint;
             return res.normalized;
         }
 
@@ -381,21 +370,18 @@ namespace AtmosphereAutopilotRedux.Modules
                 ? height_relax_Kp * height_error
                 : Math.Sign(height_error) * Math.Sqrt(2.0 * flare_acc * (abs_error - 0.5 * h_lin));
 
-            // How steep to climb or dive. With speed hold on, that depends on how much thrust (climbing) or drag
-            // (diving) there is to spare. Rate-limited so a momentary speed dip can't flatten the climb out.
-            var target_angle = max_climb_angle;
-            if (thrust_c.spd_control_enabled)
-            {
-                var spd_diff = imodel.surface_v_magnitude - thrust_c.setpoint_mps;
-                target_angle = height_error >= 0.0 ? climb_angle_limit(acc, spd_diff) : descent_angle_limit(acc, spd_diff);
-            }
-            allowed_angle += Common.Clamp(target_angle - allowed_angle, climb_angle_rate * dt);
+            // Steepest climb or dive, rate-limited so the cap eases in. With speed hold on, how much of that the
+            // engines can pay for is the energy balance's business below.
+            allowed_angle += Common.Clamp(max_climb_angle - allowed_angle, climb_angle_rate * dt);
             var effective_max_climb_angle = allowed_angle;
 
             var max_vert_speed = vessel.horizontalSrfSpeed * Math.Tan(effective_max_climb_angle * dgr2rad);
             var apply_acc = Math.Abs(des_vert_speed) < max_vert_speed;
             debug_raw_vert_speed = des_vert_speed;
             des_vert_speed = Common.Clamp(des_vert_speed, max_vert_speed);
+            if (thrust_c.spd_control_enabled)
+                des_vert_speed = Common.Clamp(energy_balance(des_vert_speed, cur_vert_speed, acc),
+                    max_vert_speed);
 
             // Ease into the new vertical speed instead of stepping to it; its rate of change is the feed-forward,
             // so the director is told the same acceleration the command implies. The acceleration itself changes
@@ -424,51 +410,78 @@ namespace AtmosphereAutopilotRedux.Modules
             debug_relax_k = in_linear_tail ? 1.0 : 0.0;
             debug_cmd_vert_speed = commanded_vert_speed;
             debug_apply_acc = apply_acc;
+            // The throttle pays for the flight path being commanded
+            thrust_c.commanded_vertical_speed = commanded_vert_speed;
             return res.normalized;
         }
 
-        /// <summary>
-        /// Steepest climb angle, degrees, for the current speed error.
-        /// </summary>
-        /// <remarks>
-        /// Replaces upstream's pseudo-FLC, which mixed kN with m/s^2, inverted its own range check and compared radians
-        /// with degrees, so only its speed rule worked: 20 m/s under the speed target it forced the climb angle to 0,
-        /// which made climbs stall into a plateau and crawl back.
-        /// </remarks>
-        private double climb_angle_limit(double g, double spd_diff)
-        {
-            if (!pseudo_flc)
-                return max_climb_angle * Common.Clamp(vessel.srfSpeed / Math.Max(1.0, thrust_c.setpoint_mps), 0.0, 1.0);
-            // Steepest climb the engines can hold at constant speed: thrust / mass + drag = g * sin(angle)
-            var excess = thrust_c.estimated_max_thrust / Math.Max(1e-3, imodel.sum_mass) + filtered_drag;
-            var sustainable = Math.Asin(Common.Clamp(excess / Math.Max(1e-3, g), 0.0, 1.0)) * rad2dgr;
-            double angle;
-            if (spd_diff >= 0.0)
-                // faster than wanted: climb steeper and trade the extra speed for height
-                angle = sustainable + Math.Min(1.0, spd_diff / flc_margin) * (max_climb_angle - sustainable);
-            else
-                // slower than wanted: climb shallower so the engines can catch up, but keep climbing
-                angle = sustainable * Math.Max(climb_angle_floor, 1.0 + spd_diff / flc_margin);
-            return Common.Clamp(angle, min_climb_angle, max_climb_angle);
-        }
+        #region Energy balance
+
+        // Total energy control, after Lambregts: the throttle answers for total energy (speed hold plus the flight
+        // path's share, ProgradeThrustController), pitch for how it is split between height and speed. Here pitch
+        // trades speed_weight of the speed error, worth V * dV / g of height, over energy_balance_time. With the
+        // throttle pinned at full while short of speed in a climb, or at idle while fast in a descent, it moves to
+        // speed priority: the climb or descent shrinks toward min_climb_angle, never reverses. This replaces the
+        // speed rules of the old climb and descent angle limits.
 
         /// <summary>
-        /// Steepest dive angle, degrees, for the current speed error. Upstream had no speed limit on descents, so a low
-        /// speed target overspeeded on the way down.
+        /// How pitch shares the energy: 0 holds the flight path and leaves speed to the throttle (airliner path
+        /// modes), 1 splits the error evenly, 2 holds speed with pitch (level change). Throttle saturation moves it
+        /// to 2. Altitude and vertical speed hold are path modes, as on airliners.
         /// </summary>
-        private double descent_angle_limit(double g, double spd_diff)
+        public double speed_weight = 0.0;
+
+        /// <summary>
+        /// Time constant, s, pitch trades the speed share of the energy error over.
+        /// </summary>
+        public double energy_balance_time = 5.0;
+
+        /// <summary>
+        /// Time constant, s, of the move to speed priority while the throttle is saturated, and back.
+        /// </summary>
+        public double speed_priority_time = 1.0;
+
+        private double speed_priority;
+
+        internal double debug_speed_weight, debug_balance_vs;
+
+        private double energy_balance(double profile_vs, double cur_vs, double g)
         {
-            // Dive angle that holds speed with the engines idle: -drag = g * sin(angle)
-            var idle = Math.Asin(Common.Clamp(-filtered_drag / Math.Max(1e-3, g), 0.0, 1.0)) * rad2dgr;
-            double angle;
-            if (spd_diff <= 0.0)
-                // slower than wanted: dive steeper to pick speed up
-                angle = idle + Math.Min(1.0, -spd_diff / flc_margin) * (max_climb_angle - idle);
-            else
-                // faster than wanted: dive shallower so drag can bleed the extra speed
-                angle = idle * Math.Max(climb_angle_floor, 1.0 - spd_diff / flc_margin);
-            return Common.Clamp(angle, min_climb_angle, max_climb_angle);
+            var dt = Time.fixedDeltaTime;
+            var speed = imodel.surface_v_magnitude;
+            var reference = thrust_c.SpeedReference;
+            if (double.IsNaN(reference) || speed < 1.0 || g <= 0.0)
+            {
+                debug_speed_weight = speed_weight;
+                debug_balance_vs = 0.0;
+                return profile_vs;
+            }
+            var target_error = thrust_c.desired_v - speed;
+            var saturated = (thrust_c.ThrottleAtFull && target_error > 0.0 && profile_vs > 0.0) ||
+                (thrust_c.ThrottleAtIdle && target_error < 0.0 && profile_vs < 0.0);
+            speed_priority += ((saturated ? 1.0 : 0.0) - speed_priority) *
+                (1.0 - Math.Exp(-dt / Math.Max(dt, speed_priority_time)));
+            var weight = Common.Clamp(speed_weight, 0.0, 2.0);
+            weight += speed_priority * (2.0 - weight);
+            var height_share = Math.Min(1.0, 2.0 - weight);
+            var speed_share = Math.Min(1.0, weight);
+            var balance_vs = -(speed / g) * speed_share * (reference - speed) / Math.Max(dt, energy_balance_time);
+            var vs = height_share * profile_vs + (1.0 - height_share) * cur_vs + balance_vs;
+            // Speed priority may shrink an altitude change toward min_climb_angle but not turn it around
+            if (height_share < 0.99)
+            {
+                var min_vs = vessel.horizontalSrfSpeed * Math.Tan(min_climb_angle * dgr2rad);
+                if (profile_vs > 0.0)
+                    vs = Math.Max(Math.Min(vs, profile_vs), Math.Min(min_vs, profile_vs));
+                else if (profile_vs < 0.0)
+                    vs = Math.Min(Math.Max(vs, profile_vs), Math.Max(-min_vs, profile_vs));
+            }
+            debug_speed_weight = weight;
+            debug_balance_vs = balance_vs;
+            return vs;
         }
+
+        #endregion
 
         /// <summary>
         /// Course of the current surface velocity, in the same convention as <see cref="desired_course" />.
