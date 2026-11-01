@@ -44,6 +44,7 @@ namespace AtmosphereAutopilotRedux
                 // The runtime goes first so the window controller finds it in Awake
                 window.gameObject.AddComponent<Runtime.AARuntime>();
                 _controller = window.gameObject.AddComponent<WindowController>();
+                window.gameObject.AddComponent<SetpointKeys>();
             };
 
 
@@ -52,13 +53,15 @@ namespace AtmosphereAutopilotRedux
             {
                 if (h.Status != AsyncOperationStatus.Succeeded) return;
                 _icon = h.Result;
+                // Registered once here, not per campaign: Space Warp builds the flight app bar from its list
+                // whenever flight opens, and loading a save straight into flight can do that before our
+                // campaign callback runs. The list already hides the button while the mod is disabled.
+                Appbar.RegisterAppButton("Atmosphere Autopilot", "BTN-AtmosphereAutopilot", _icon,
+                    on =>
+                    {
+                        if (_controller != null) _controller.isOpen = on;
+                    });
             };
-        }
-
-        public override void OnCampaignLoaded()
-        {
-            Appbar.RegisterAppButton("Atmosphere Autopilot", "BTN-AtmosphereAutopilot", _icon,
-                on => _controller.isOpen = on);
         }
     }
 }

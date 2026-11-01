@@ -120,7 +120,9 @@ namespace AtmosphereAutopilotRedux.Runtime
             var up = (com - mainBody.position).normalized;
             horizontalSrfSpeed = Vector3d.Exclude(up, srf_velocity).magnitude;
 
-            altitude = Sim.AltitudeFromSeaLevel;
+            // Telemetry altitude refreshes once per frame, so it repeats on the second physics step of a two-step
+            // frame. Measured from the live CoM instead.
+            altitude = (com - mainBody.position).magnitude - mainBody.Radius;
             latitude = Sim.Latitude;
             longitude = Sim.Longitude;
             heightFromTerrain = Sim.AltitudeFromTerrain;

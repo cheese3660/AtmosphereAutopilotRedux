@@ -114,6 +114,12 @@ namespace AtmosphereAutopilotRedux.Modules
         /// </summary>
         public double integral_limit = 2.0;
 
+        /// <summary>
+        /// Time constant, s, the engines' spool is driven to follow the wanted throttle with. Engines that spool slower
+        /// than this get their throttle request overdriven. Zero turns it off. Not in upstream.
+        /// </summary>
+        public double spool_time = 0.4;
+
         private double v_integral = 0.0;
         private float last_throttle = 0.0f;
 
@@ -213,8 +219,8 @@ namespace AtmosphereAutopilotRedux.Modules
 
                 thrust_error = acc_error * imodel.sum_mass;
                 surfspd_dir = imodel.surface_v.normalized;
-                cntrl.mainThrottle = steady_state_throttle(prograde_thrust + thrust_error);
-                last_throttle = cntrl.mainThrottle;
+                last_throttle = steady_state_throttle(prograde_thrust + thrust_error);
+                cntrl.mainThrottle = spool_compensated(last_throttle);
 
                 //prev_thrust = prograde_thrust;
             }
@@ -249,6 +255,42 @@ namespace AtmosphereAutopilotRedux.Modules
             return (float)Common.Clamp(throttle, 0.0, 1.0);
         }
 
+        /// <summary>
+        /// Throttle request that makes the engines' own throttle reach the wanted one within spool_time.
+        /// </summary>
+        /// <remarks>
+        /// Engines with response time ease their throttle toward the request with Lerp(cur, req, k * dt), a ~2 s lag
+        /// on stock jets that made speed hold overshoot and settle slowly. Asking for cur + (wanted - cur) / (k *
+        /// spool_time) makes them move at the faster rate until the clamp to 0..1 limits it. The slowest engine sets
+        /// the pace.
+        /// </remarks>
+        private float spool_compensated(float wanted)
+        {
+            var cur = 0.0;
+            var k = double.PositiveInfinity;
+            for (var i = 0; i < imodel.engines.Count; i++)
+            {
+                var mode = imodel.engines[i].Mode;
+                var data = imodel.engines[i].Data;
+                if (mode == null || data == null || !mode.useEngineResponseTime)
+                    continue;
+                var c = data.currentThrottle;
+                var rate = wanted > c ? mode.engineAccelerationSpeed : mode.engineDecelerationSpeed;
+                if (rate < k)
+                {
+                    k = rate;
+                    cur = c;
+                }
+            }
+            debug_spool_rate = double.IsInfinity(k) ? 0.0 : k;
+            if (double.IsInfinity(k) || k <= 0.0 || spool_time <= 0.0)
+                return wanted;
+            var gain = 1.0 / (k * spool_time);
+            if (gain <= 1.0)
+                return wanted;
+            return (float)Common.Clamp(cur + (wanted - cur) * gain, 0.0, 1.0);
+        }
+
         // [AutoGuiAttr("iter_count", false)]
         public int iter_count;
 
@@ -258,6 +300,8 @@ namespace AtmosphereAutopilotRedux.Modules
         internal double DebugAccError => acc_error;
         internal double debug_predicted_thrust;
         internal double debug_thrust_authority;
+        internal double debug_spool_rate;
+        internal float DebugWantedThrottle => last_throttle;
 
         // [AutoGuiAttr("v_error", false, "G5")]
         private double v_error;

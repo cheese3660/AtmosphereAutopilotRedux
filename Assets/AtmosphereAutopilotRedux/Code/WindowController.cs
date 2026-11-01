@@ -101,6 +101,12 @@ namespace AtmosphereAutopilotRedux
             _altitudeInput.RegisterValueChangedCallback(_ => PushVertical());
             _vsInput.RegisterValueChangedCallback(_ => PushVertical());
 
+            // Window.Create only does this for TextFields, so typing a number would also fire flight keys
+            _speedInput.DisableGameInputOnFocus();
+            _headingInput.DisableGameInputOnFocus();
+            _altitudeInput.DisableGameInputOnFocus();
+            _vsInput.DisableGameInputOnFocus();
+
             RefreshSelectors();
 
             _runtime = GetComponent<AARuntime>();
@@ -327,6 +333,52 @@ namespace AtmosphereAutopilotRedux
                     cruise.vertical_control = false;
                     break;
             }
+        }
+
+        #endregion
+
+        #region Keyboard nudges
+
+        internal bool AltitudeHeld => _vertical == Vertical.Altitude;
+
+        internal bool VerticalSpeedHeld => _vertical == Vertical.Speed;
+
+        internal void NudgeSpeed(int delta)
+        {
+            _speedInput.SetValueWithoutNotify(Mathf.Max(0f, Mathf.Round(_speedInput.value) + delta));
+            PushSpeed();
+        }
+
+        internal void NudgeVertical(int delta)
+        {
+            switch (_vertical)
+            {
+                case Vertical.Altitude:
+                    _altitudeInput.SetValueWithoutNotify(Mathf.Max(0, _altitudeInput.value + delta));
+                    break;
+                case Vertical.Speed:
+                    _vsInput.SetValueWithoutNotify(_vsInput.value + delta);
+                    break;
+                default:
+                    return;
+            }
+            PushVertical();
+        }
+
+        internal void NudgeHeading(int delta)
+        {
+            switch (_course)
+            {
+                case Course.Waypoint:
+                    return;
+                // Steering off the held great circle starts a heading hold from the current course
+                case Course.Hold:
+                    SelectCourse(Course.Heading);
+                    break;
+            }
+            var heading = (_headingInput.value + delta) % 360;
+            _headingInput.SetValueWithoutNotify(heading < 0 ? heading + 360 : heading);
+            PushHeading();
         }
 
         #endregion

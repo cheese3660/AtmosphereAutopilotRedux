@@ -93,6 +93,8 @@ namespace AtmosphereAutopilotRedux.Runtime
 
         internal AngularVelAdaptiveController[] VelocityControllers { get; }
 
+        internal DirectorController Director => (DirectorController)modules[typeof(DirectorController)];
+
         // Diagnostics, see FlightRecorder
         private readonly FlightRecorder recorder;
 

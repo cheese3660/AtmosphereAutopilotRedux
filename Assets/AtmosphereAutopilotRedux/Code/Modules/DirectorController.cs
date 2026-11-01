@@ -48,6 +48,7 @@ namespace AtmosphereAutopilotRedux.Modules
         private PitchAngularVelocityController pitch_c;
         private YawAngularVelocityController yaw_c;
         private RollAngularVelocityController roll_c;
+        private ProgradeThrustController thrust_c;
         private FlightModel imodel;
 
         public override void InitializeDependencies(Dictionary<Type, AutopilotModule> modules)
@@ -58,6 +59,7 @@ namespace AtmosphereAutopilotRedux.Modules
             pitch_c = modules[typeof(PitchAngularVelocityController)] as PitchAngularVelocityController;
             roll_c = modules[typeof(RollAngularVelocityController)] as RollAngularVelocityController;
             yaw_c = modules[typeof(YawAngularVelocityController)] as YawAngularVelocityController;
+            thrust_c = modules[typeof(ProgradeThrustController)] as ProgradeThrustController;
         }
 
         private bool aoa_moderation_saved = false;
@@ -70,6 +72,8 @@ namespace AtmosphereAutopilotRedux.Modules
             side_c.Activate();      // upstream called side_c without activating it
             yaw_c.Activate();
             roll_c.Activate();
+            commanded_turn_acc = Vector3d.zero;
+            turn_limit_frac = 1.0;
             // save moderation states
             aoa_moderation_saved = pitch_c.moderate_aoa;
             sideslip_moderation_saved = yaw_c.moderate_aoa;
@@ -96,23 +100,49 @@ namespace AtmosphereAutopilotRedux.Modules
             get => this.strength.ToString("G4");
         }
 
-        // [AutoGuiAttr("roll_stop_k", true, "G5")]
-        public float roll_stop_k = 1.0f;
-
         // [AutoGuiAttr("angular error", false, "G5")]
         public double angular_error;
 
-        // [AutoGuiAttr("max_angular_v", false, "G5")]
-        public double max_angular_v;
+        /// <summary>
+        /// Time constant, s, of heading tracking: turn acceleration is horizontal velocity error over this.
+        /// </summary>
+        public double turn_time = 6.0;
 
-        // [AutoGuiAttr("stop_time_roll", false, "G5")]
-        public double stop_time_roll;
+        /// <summary>
+        /// Time constant, s, of vertical velocity tracking.
+        /// </summary>
+        public double vert_time = 1.0;
 
-        // [AutoGuiAttr("relaxation_margin", true, "G5")]
-        public double relaxation_margin = 0.01;
+        /// <summary>
+        /// Hardest turn, in g of horizontal acceleration, ever asked for.
+        /// </summary>
+        public double max_turn_g = 4.0;
 
-        // [AutoGuiAttr("angle_relaxation_k", true, "G5")]
-        public float angle_relaxation_k = 0.1f;
+        /// <summary>
+        /// Fastest change of the turn acceleration, g per second. Lets the bank build and unwind smoothly.
+        /// </summary>
+        public double turn_jerk_g = 0.5;
+
+        /// <summary>
+        /// Speed deficit, m/s, under the speed hold setpoint over which the turn limit shrinks to its floor.
+        /// </summary>
+        public double turn_speed_margin = 20.0;
+
+        /// <summary>
+        /// Fraction of max_turn_g kept however much speed the turn is bleeding.
+        /// </summary>
+        public double turn_limit_floor = 0.075;
+
+        /// <summary>
+        /// How fast the turn limit fraction may change, per second.
+        /// </summary>
+        public double turn_limit_rate = 0.2;
+
+        private Vector3d commanded_turn_acc = Vector3d.zero;
+        private double turn_limit_frac = 1.0;
+
+        // Diagnostics for FlightRecorder
+        internal double debug_turn_limit, debug_turn_acc, debug_turn_error;
 
         // [VesselSerializable("max_neg_g")]
         // [AutoGuiAttr("max_neg_g", true, "G5")]
@@ -155,32 +185,50 @@ namespace AtmosphereAutopilotRedux.Modules
             var max_turn_acc = non_stall_turn_acceleration(desired_turn_acc_dir, max_lift_acc);
             max_turn_acc = strength * max_turn_acc * (precision_mode ? 0.4 : 1.0);
 
-            // now let's take roll speed and relaxation into account
-            var max_angular_v = max_turn_acc.magnitude / imodel.surface_v_magnitude;
-            var t1 = max_roll_v / roll_acc_factor;
-            var t2 = (90.0 * dgr2rad - t1 * max_roll_v) / max_roll_v;
-            var stop_time_roll = roll_stop_k * (2.0 * t1 + t2);
-            if (double.IsNaN(stop_time_roll) || double.IsInfinity(stop_time_roll))
-                stop_time_roll = 2.0;
-            if (stop_time_roll <= 0.0)
-                stop_time_roll = 0.5;
+            // Upstream turned at max_turn_acc until the remaining error fit in the roll's stopping time, then eased
+            // off. That made the turn gain V / stop_time, and fast-rolling craft stop in under a second, so a 1 degree
+            // heading change at 500 m/s asked for over 1 g and snap-rolled into it. Instead the velocity error is
+            // tracked with time constants: slow for heading, quicker for climb and descent, whose command is already
+            // shaped by the cruise altitude hold.
+            var dt = Time.fixedDeltaTime;
+            var speed = imodel.surface_v_magnitude;
+            var vel_error = desired_vel.normalized * speed - imodel.surface_v;
+            vel_error -= Vector3d.Project(vel_error, imodel.surface_v);      // speed is the thrust controller's job
+            var vert_error = Vector3d.Project(vel_error, planet2vesNorm);
+            var turn_error = vel_error - vert_error;
 
-            // now let's generate desired acceleration
-            if (angular_error / max_angular_v > stop_time_roll)
+            // The turn limit shrinks while the turn bleeds speed below the speed hold setpoint, so the craft turns as
+            // hard as its engines can sustain
+            var limit_frac_target = 1.0;
+            if (thrust_c.spd_control_enabled)
             {
-                // we're far away from relaxation, let's simply produce maximum acceleration
-                shift_acc = max_turn_acc;
+                var spd_diff = speed - thrust_c.setpoint_mps;
+                if (spd_diff < 0.0)
+                    limit_frac_target = Math.Max(turn_limit_floor, 1.0 + spd_diff / turn_speed_margin);
             }
-            else
-            {
-                // we're relaxing now, quadratic descend is good approximation
-                {
-                    var tk = (angular_error / max_angular_v) / stop_time_roll;
-                    if (Math.Abs(angular_error) < relaxation_margin)
-                        tk *= Mathf.Lerp(1.0f, angle_relaxation_k, (float)(1.0f - Math.Abs(angular_error) / relaxation_margin));
-                    shift_acc = max_turn_acc * tk;
-                }
-            }
+            turn_limit_frac += Common.Clamp(limit_frac_target - turn_limit_frac, turn_limit_rate * dt);
+            var turn_limit = Math.Min(max_turn_g * 9.81 * turn_limit_frac, max_turn_acc.magnitude);
+
+            var wanted_turn_acc = turn_error / turn_time;
+            if (wanted_turn_acc.magnitude > turn_limit)
+                wanted_turn_acc *= turn_limit / wanted_turn_acc.magnitude;
+            // Jerk limit, so the bank angle builds and unwinds instead of snapping
+            var turn_step = wanted_turn_acc - commanded_turn_acc;
+            var max_step = turn_jerk_g * 9.81 * dt;
+            if (turn_step.magnitude > max_step)
+                turn_step *= max_step / turn_step.magnitude;
+            commanded_turn_acc += turn_step;
+            // keep it horizontal and normal to the velocity as both rotate
+            commanded_turn_acc -= Vector3d.Project(commanded_turn_acc, planet2vesNorm);
+            commanded_turn_acc -= Vector3d.Project(commanded_turn_acc, imodel.surface_v);
+
+            shift_acc = commanded_turn_acc + vert_error / vert_time;
+            if (shift_acc.magnitude > max_turn_acc.magnitude)
+                shift_acc *= max_turn_acc.magnitude / shift_acc.magnitude;
+
+            debug_turn_limit = turn_limit;
+            debug_turn_acc = commanded_turn_acc.magnitude;
+            debug_turn_error = turn_error.magnitude / Math.Max(1.0, speed) * rad2dgr;
 
             //if (angular_error > 0.2 || Vector3d.Dot(desired_acceleration, shift_acc) < -0.1)
             //    target_acc = shift_acc;

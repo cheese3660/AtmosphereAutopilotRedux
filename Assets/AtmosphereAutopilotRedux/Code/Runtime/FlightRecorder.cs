@@ -159,6 +159,7 @@ namespace AtmosphereAutopilotRedux.Runtime
             Col("q", m.dyn_pressure);
             Col("spd", vessel.srfSpeed);
             Col("alt", vessel.altitude);
+            Col("alt_tel", vessel.Sim.AltitudeFromSeaLevel);
             Col("mass", m.sum_mass);
             Col("moi_p", m.MOI.x);
             Col("moi_r", m.MOI.y);
@@ -279,6 +280,34 @@ namespace AtmosphereAutopilotRedux.Runtime
             Col("t_auth", tc.debug_thrust_authority);
             Col("t_iter", tc.iter_count);
             Col("t_maxT", tc.estimated_max_thrust);
+            Col("t_wanted", tc.DebugWantedThrottle);
+            Col("t_spool_k", tc.debug_spool_rate);
+
+            // 8. cruise altitude hold and director
+            CruiseController cc = context.Cruise;
+            DirectorController dc = context.Director;
+            Vector3d up = (vessel.GetWorldPos3D() - vessel.mainBody.position).normalized;
+            Col("c_mode", (int)cc.current_mode);
+            Col("c_vert", cc.vertical_control ? (cc.height_mode == CruiseController.HeightMode.Altitude ? 1 : 2) : 0);
+            Col("c_alt_set", cc.desired_altitude);
+            Col("c_vs_set", cc.desired_vertsetpoint);
+            Col("c_vs", Vector3d.Dot(vessel.srf_velocity, up));
+            Col("c_h_err", cc.debug_height_error);
+            Col("c_vs_raw", cc.debug_raw_vert_speed);
+            Col("c_vs_cmd", cc.debug_cmd_vert_speed);
+            Col("c_vs_max", cc.debug_max_vert_speed);
+            Col("c_climb_ang", cc.debug_max_climb_angle);
+            Col("c_relax_k", cc.debug_relax_k);
+            Flag("c_apply_acc", cc.debug_apply_acc);
+            Col("c_vert_acc", Vector3d.Dot(cc.DebugDesiredVertAcc, up));
+            Col("c_drag_f", cc.DebugFilteredDrag);
+            Col("d_aoa", dc.desired_aoa);
+            Col("d_max_lift", dc.max_lift_acc);
+            Col("d_strength", dc.strength);
+            Col("d_turn_err", dc.debug_turn_error);
+            Col("d_turn_acc", dc.debug_turn_acc);
+            Col("d_turn_limit", dc.debug_turn_limit);
+            Col("d_roll_err", dc.roll_error);
 
             if (writer == null)
                 Open(vessel);
