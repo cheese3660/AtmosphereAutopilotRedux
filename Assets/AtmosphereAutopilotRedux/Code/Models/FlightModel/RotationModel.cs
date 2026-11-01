@@ -67,6 +67,7 @@ namespace AtmosphereAutopilotRedux.Models
             if (moments_cycle_counter == 0)
             {
                 check_csurfaces();
+                gather_torque_surfaces();
                 get_moments();
                 reaction_torque = get_sas_authority();
                 get_rcs_characteristics();
@@ -78,6 +79,39 @@ namespace AtmosphereAutopilotRedux.Models
         }
 
         public bool HasControlSurfaces { get; private set; }
+
+        /// <summary>
+        /// PhysX angular damping on the vessel, 1/s. KSP2 sets it every step to the parts' angularDrag times the
+        /// dynamic pressure in atmospheres times AngularDragMultiplier, and PhysX scales the angular velocity by
+        /// 1 - damping * dt after applying the step's torques. Near Mach 4 at sea level that removes most of any
+        /// rotation within one step. With separate part rigidbodies, the moment-of-inertia-weighted mean.
+        /// </summary>
+        public float angular_damping;
+
+        /// <summary>
+        /// Share of the angular velocity, torque change included, that survives this step's PhysX damping.
+        /// </summary>
+        public float AngularDampingFactor => Mathf.Max(0.0f, 1.0f - angular_damping * Time.fixedDeltaTime);
+
+        /// <summary>
+        /// Lowest damping factor the torque acceleration divides by. Below the speed limit's damping, which keeps
+        /// the factor above 0.05, so the division stays exact where the vessel flies.
+        /// </summary>
+        public const float MinAngularDampingFactor = 0.02f;
+
+        /// <summary>
+        /// Angular acceleration from torques over the last step, before PhysX damping took its share:
+        /// w_new = f * (w_old + torque_acc * dt). Aerodynamic and engine torques answer to this, not to the net
+        /// acceleration, which near Mach 4 at sea level is mostly the damping.
+        /// </summary>
+        public double TorqueAcc(int axis)
+        {
+            var vel = angular_v_buf[axis];
+            if (vel.Size < 2)
+                return angular_acc_buf[axis].Size > 0 ? angular_acc_buf[axis].GetLast() : 0.0;
+            var f = Mathf.Max(MinAngularDampingFactor, AngularDampingFactor);
+            return (vel.GetLast() / f - vel.GetFromTail(1)) / Time.fixedDeltaTime;
+        }
 
         /// <summary>
         /// Normalized control surface actuation speed, in full deflections per second. KSP2 surfaces move at
@@ -207,6 +241,7 @@ namespace AtmosphereAutopilotRedux.Models
                 var principal_to_cntrl = world_to_cntrl_part * shared_body.rotation * shared_body.inertiaTensorRotation;
                 MOI = get_rotated_moi(shared_body.inertiaTensor, principal_to_cntrl);
                 angular_vel = -(world_to_cntrl_part * shared_body.angularVelocity);     // minus because left-handed Unity
+                angular_damping = shared_body.angularDamping;
             }
             else
             {
@@ -229,6 +264,8 @@ namespace AtmosphereAutopilotRedux.Models
                 var com_velocity = impulse_sum / sum_mass;
 
                 // Second pass: moment of inertia and angular momentum around the center of mass
+                var damping_sum = 0.0f;
+                var damping_weight = 0.0f;
                 foreach (var rb in seen_bodies)
                 {
                     var mass = rb.mass;
@@ -248,8 +285,12 @@ namespace AtmosphereAutopilotRedux.Models
 
                     MOI += moi;
                     AM -= am;                   // minus because left-handed Unity
+                    var weight = moi.x + moi.y + moi.z;
+                    damping_sum += rb.angularDamping * weight;
+                    damping_weight += weight;
                 }
                 angular_vel = Common.DivideVector(AM, MOI);
+                angular_damping = damping_weight > 0.0f ? damping_sum / damping_weight : 0.0f;
             }
 
             surface_v = vessel.srf_velocity;

@@ -100,13 +100,13 @@ namespace AtmosphereAutopilotRedux.Models
             pitch_aero_torque_task.base_gen_weight = 0.0001f;
             pitch_aero_torque_task.linear_time_decay = 0.005f;
             pitch_aero_torque_task.nonlin_time_decay = 0.01f;
-            pitch_aero_torque_task.validator = (a, b) => pitch_validator(pitch_aero_torque_model, a, b);
+            pitch_aero_torque_task.validator = (a, b) => pitch_validator(PITCH, pitch_aero_torque_model, a, b);
 
             pitch_aero_torque_task_gen.linmodel = pitch_aero_torque_model_gen;
             pitch_aero_torque_task_gen.base_gen_weight = 0.5f;
             pitch_aero_torque_task_gen.linear_time_decay = 0.005f;
             pitch_aero_torque_task_gen.nonlin_time_decay = 0.01f;
-            pitch_aero_torque_task_gen.validator = (a, b) => pitch_validator(pitch_aero_torque_model_gen, a, b);
+            pitch_aero_torque_task_gen.validator = (a, b) => pitch_validator(PITCH, pitch_aero_torque_model_gen, a, b);
 
             pitch_trainer = new OnlineLinTrainer(IMM_BUF_SIZE, new double[] { 0.01, 0.05 },
                 new int[] { 20, 20 }, pitch_input_method, pitch_output_method, pitch_aero_torque_task_gen, pitch_aero_torque_task);
@@ -140,13 +140,13 @@ namespace AtmosphereAutopilotRedux.Models
             yaw_aero_torque_task.base_gen_weight = 0.0001f;
             yaw_aero_torque_task.linear_time_decay = 0.005f;
             yaw_aero_torque_task.nonlin_time_decay = 0.01f;
-            yaw_aero_torque_task.validator = (a, b) => pitch_validator(yaw_aero_torque_model, a, b);
+            yaw_aero_torque_task.validator = (a, b) => pitch_validator(YAW, yaw_aero_torque_model, a, b);
 
             yaw_aero_torque_task_gen.linmodel = yaw_aero_torque_model_gen;
             yaw_aero_torque_task_gen.base_gen_weight = 0.5f;
             yaw_aero_torque_task_gen.linear_time_decay = 0.005f;
             yaw_aero_torque_task_gen.nonlin_time_decay = 0.01f;
-            yaw_aero_torque_task_gen.validator = (a, b) => pitch_validator(yaw_aero_torque_model_gen, a, b);
+            yaw_aero_torque_task_gen.validator = (a, b) => pitch_validator(YAW, yaw_aero_torque_model_gen, a, b);
 
             yaw_trainer = new OnlineLinTrainer(IMM_BUF_SIZE, new double[] { 0.01, 0.05 },
                 new int[] { 20, 20 }, yaw_input_method, yaw_output_method, yaw_aero_torque_task_gen, yaw_aero_torque_task);
@@ -200,25 +200,53 @@ namespace AtmosphereAutopilotRedux.Models
 
         private double pitch_output_method()
         {
-            return (angular_acc_buf[PITCH].GetLast() -
+            return (TorqueAcc(PITCH) -
                 (reaction_torque[PITCH] * input_buf[PITCH].GetLast() + engines_torque_principal[PITCH] +
                 get_rcs_torque(PITCH, input_buf[PITCH].GetLast())) / MOI[PITCH]) * MOI[PITCH] / dyn_pressure * 1e2;
         }
 
-        private bool pitch_validator(LinApprox linmodel, bool[] changed, bool[] reassigned)
+        private bool pitch_validator(int axis, LinApprox linmodel, bool[] changed, bool[] reassigned)
         {
-            if (HasControlSurfaces)
+            var ret = false;
+            changed.CopyTo(reassigned, 0);
+            // Terms from the game's lift model are held, and the rest is fitted around them
+            var stiffness = held_analytic_stiffness(axis);
+            if (!double.IsNaN(stiffness))
+            {
+                linmodel.tpars[1] = stiffness;
+                reassigned[0] = false;
+                ret = true;
+            }
+            else if (!changed[0] && linmodel.tpars[1] == 0.0)
+            {
+                // AoA hasn't moved enough to fit its term yet. The game's wing-only value has the right sign and
+                // about a quarter of the size, which beats assuming neutral stability until the first manoeuvre.
+                var estimate = analytic_stiffness_estimate(axis);
+                if (!double.IsNaN(estimate))
+                {
+                    linmodel.tpars[1] = estimate;
+                    ret = true;
+                }
+            }
+            var analytic = held_analytic_authority(axis);
+            if (HasControlSurfaces && !double.IsNaN(analytic))
+            {
+                linmodel.tpars[2] = analytic;
+                reassigned[1] = false;
+                ret = true;
+            }
+            else if (HasControlSurfaces)
+            {
                 if (linmodel.tpars[2] < 1e-6)       // authority can't be negative or zero
                 {
                     linmodel.tpars[2] = MOI[0] / 1000.0;
-                    changed.CopyTo(reassigned, 0);
                     reassigned[1] = false;
-                    return true;
+                    ret = true;
                 }
-                else { }
+            }
             else
                 linmodel.tpars[2] = 0.0;
-            return false;
+            return ret;
         }
 
         private void roll_input_method(Vector v)
@@ -231,7 +259,7 @@ namespace AtmosphereAutopilotRedux.Models
 
         private double roll_output_method()
         {
-            return (angular_acc_buf[ROLL].GetLast() -
+            return (TorqueAcc(ROLL) -
                 (reaction_torque[ROLL] * input_buf[ROLL].GetLast() + engines_torque_principal[ROLL] +
                 get_rcs_torque(ROLL, input_buf[ROLL].GetLast())) / MOI[ROLL]) * MOI[ROLL] / dyn_pressure * 1e2;
         }
@@ -240,13 +268,36 @@ namespace AtmosphereAutopilotRedux.Models
         {
             var ret = false;
             changed.CopyTo(reassigned, 0);
-            if (linmodel.tpars[2] > 0.0)      // friction must kill rotation
+            var damping = held_analytic_roll_damping();
+            if (!double.IsNaN(damping))
+            {
+                // Roll damping comes from the game's wing lift
+                linmodel.tpars[2] = damping;
+                reassigned[1] = false;
+                ret = true;
+            }
+            else if (linmodel.tpars[2] > 0.0)      // friction must kill rotation
             {
                 linmodel.tpars[2] = 0.0;
                 reassigned[1] = false;
                 ret = true;
             }
-            if (HasControlSurfaces)
+            // Terms from the game's lift model are held, and the rest is fitted around them
+            var stiffness = held_analytic_stiffness(ROLL);
+            if (!double.IsNaN(stiffness))
+            {
+                linmodel.tpars[1] = stiffness;
+                reassigned[0] = false;
+                ret = true;
+            }
+            var analytic = held_analytic_authority(ROLL);
+            if (HasControlSurfaces && !double.IsNaN(analytic))
+            {
+                linmodel.tpars[3] = analytic;
+                reassigned[2] = false;
+                ret = true;
+            }
+            else if (HasControlSurfaces)
             {
                 if (linmodel.tpars[3] < 1e-6)      // authority can't be negative or zero
                 {
@@ -268,7 +319,7 @@ namespace AtmosphereAutopilotRedux.Models
 
         private double yaw_output_method()
         {
-            return (angular_acc_buf[YAW].GetLast() -
+            return (TorqueAcc(YAW) -
                 (reaction_torque[YAW] * input_buf[YAW].GetLast() + engines_torque_principal[YAW] +
                 get_rcs_torque(YAW, input_buf[YAW].GetLast())) / MOI[YAW]) * MOI[YAW] / dyn_pressure * 1e2;
         }

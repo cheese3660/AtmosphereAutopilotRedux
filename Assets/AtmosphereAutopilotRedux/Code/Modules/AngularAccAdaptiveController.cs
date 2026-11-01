@@ -64,6 +64,7 @@ namespace AtmosphereAutopilotRedux.Modules
         protected override void OnActivate()
         {
             imodel.Activate();
+            reset_indi_scale();
         }
 
         protected override void OnDeactivate()
@@ -150,6 +151,12 @@ namespace AtmosphereAutopilotRedux.Modules
             if (FlightModel.aero_delay_steps > 0)
             {
                 next_acc = eval_next_acc(out aoa_rate);
+                update_indi_scale();
+                // The incremental estimate needs no aero model beyond authority
+                var indi_next = indi_next_acc();
+                DebugIndiNext = indi_next;
+                if (!double.IsNaN(indi_next))
+                    next_acc = indi_next;
                 if (double.IsNaN(next_acc) || double.IsInfinity(next_acc))
                     next_acc = 0.0;
                 if (float.IsNaN(aoa_rate) || float.IsInfinity(aoa_rate))
@@ -170,10 +177,263 @@ namespace AtmosphereAutopilotRedux.Modules
 
         #endregion
 
+        #region Incremental control
+
+        // Incremental nonlinear dynamic inversion (INDI), written from the published concept. The measured angular
+        // acceleration already holds every aerodynamic and engine effect, so only the change the surfaces make has
+        // to be modelled, and that needs nothing but control authority. The learned constant, AoA, damping and
+        // sideslip terms drop out, and with them the prediction errors they gave at high dynamic pressure.
+        //
+        // Timing, as the regression pairs it: the acceleration measured this step answers to the surface position
+        // from two commands ago. The one committed last step shows up in the coming step, and the one chosen now in
+        // the step after it, which is the step the velocity controller's target is for.
+
+        /// <summary>
+        /// Use incremental control when the game's surface authority is available for this axis.
+        /// </summary>
+        public bool indi_control = true;
+
+        /// <summary>
+        /// Share of the remaining acceleration error the incremental law corrects per step.
+        /// </summary>
+        public float indi_gain = 1.0f;
+
+        // Set by indi_required_input for the derived controllers' diagnostics
+        protected double indi_authority = double.NaN;
+        protected double indi_predicted_acc = double.NaN;
+
+        /// <summary>
+        /// Acceleration the incremental estimate expects for the coming step. NaN when it isn't running.
+        /// </summary>
+        internal double DebugIndiNext = double.NaN;
+
+        /// <summary>
+        /// Time over which old samples fade from the authority estimate, s.
+        /// </summary>
+        public float indi_scale_forget_time = 1.5f;
+
+        /// <summary>
+        /// Range the authority estimate may take, as a multiple of the game's value.
+        /// </summary>
+        public float indi_scale_min = 0.05f, indi_scale_max = 1.5f;
+
+        /// <summary>
+        /// Time constant of the smoothing between the fitted scale and the one incremental control uses while the
+        /// fit is above it, s. During fast transients the fit is pulled off by the controller's own reactions for a
+        /// second or two, so the used scale follows the fit slowly.
+        /// </summary>
+        public float indi_scale_smooth_time = 3.0f;
+
+        /// <summary>
+        /// The same while the fit is below the used scale, s. Past about Mach 3.5 the real authority can fall to a
+        /// quarter within a few seconds, and following that too slowly leaves the controller overestimating it.
+        /// </summary>
+        public float indi_scale_fall_time = 1.0f;
+
+        // Weight of the starting value, in squared rad/s^2 of predicted acceleration step. Small, so a few real
+        // surface steps outweigh it, and it fades with the rest.
+        private const double indi_scale_prior = 1e-3;
+
+        private double indi_sxx, indi_sxy;
+        private double indi_scale_fit = 1.0;
+        private double indi_scale = 1.0;
+
+        /// <summary>
+        /// Real surface authority as a multiple of the game's value, as incremental control uses it.
+        /// </summary>
+        internal double DebugIndiScale => indi_scale;
+
+        /// <summary>
+        /// The fitted scale before smoothing.
+        /// </summary>
+        internal double DebugIndiScaleFit => indi_scale_fit;
+
+        /// <summary>
+        /// Surface authority incremental control works with, rad/s^2 of net angular acceleration per full
+        /// deflection: the game's value with the measured scale and PhysX damping on it. NaN when incremental
+        /// control isn't running.
+        /// </summary>
+        internal double IndiAuthority => IndiActive ? indi_surface_authority() * imodel.AngularDampingFactor : double.NaN;
+
+        private void reset_indi_scale()
+        {
+            indi_sxx = indi_scale_prior;
+            indi_sxy = indi_scale_prior;
+            indi_scale_fit = 1.0;
+            indi_scale = 1.0;
+        }
+
+        // The game's surface authority is right at low speed but runs ahead of the real one with Mach, by three to
+        // four times near Mach 4 in flight tests, and incremental control goes unstable once it overestimates by
+        // about three. The acceleration step answers to the surface step two commands back, cleanly enough to fit
+        // even in steady flight, so the scale on the game's value is fitted from that by least squares with
+        // exponential forgetting. Small steps weigh little, so quiet flight keeps the last estimate.
+        //
+        // The fit uses second differences, the change of each step. In steady flight the surfaces creep with trim
+        // while the acceleration stays at zero, since the trim is what cancels it, and on plain steps that creep
+        // pulled the fit to its floor in level flight. A steady creep has no second difference.
+        private void update_indi_scale()
+        {
+            if (!indi_control)
+                return;
+            if (!indi_off_ground())
+            {
+                // Start the fit afresh from the current scale once airborne, so nothing from the ground lingers
+                indi_sxx = indi_scale_prior;
+                indi_sxy = indi_scale_prior * indi_scale;
+                indi_scale_fit = indi_scale;
+                return;
+            }
+            var surface_authority = imodel.IndiSurfaceAuthority(axis);
+            if (double.IsNaN(surface_authority) || surface_authority <= 0.0)
+                return;
+            var vel_history = imodel.AngularVelHistory(axis);
+            var surface = imodel.ControlSurfPosHistory(axis);
+            var input = imodel.ControlInputHistory(axis);
+            if (vel_history.Size < 4 || surface.Size < 4 || input.Size < 4)
+                return;
+            // The fit runs on the torque acceleration, before PhysX damping, so the scale is only what the game's
+            // lift estimate misses
+            var x = surface_authority * second_difference(surface, 1);
+            var y = indi_torque_acc(0) - 2.0 * indi_torque_acc(1) + indi_torque_acc(2) -
+                imodel.IndiDirectAuthority(axis) * second_difference(input, 1);
+            if (double.IsNaN(x) || double.IsNaN(y) || double.IsInfinity(x) || double.IsInfinity(y))
+                return;
+            var forget = Math.Exp(-Time.fixedDeltaTime / indi_scale_forget_time);
+            indi_sxx = forget * indi_sxx + x * x;
+            indi_sxy = forget * indi_sxy + x * y;
+            if (indi_sxx > 1e-12)
+                indi_scale_fit = Common.Clamp(indi_sxy / indi_sxx, indi_scale_min, indi_scale_max);
+            var smooth_time = indi_scale_fit < indi_scale ? indi_scale_fall_time : indi_scale_smooth_time;
+            indi_scale += (indi_scale_fit - indi_scale) * (1.0 - Math.Exp(-Time.fixedDeltaTime / smooth_time));
+        }
+
+        /// <summary>
+        /// Time after the last ground contact, s, before incremental control and its authority fit trust the
+        /// measured acceleration. The differences it works from reach a few steps back, and on a bouncing takeoff
+        /// one sample spanning a wheel strike pulled the yaw and roll scale to its floor.
+        /// </summary>
+        public float indi_liftoff_settle_time = 0.5f;
+
+        private double indi_last_ground_time = double.NegativeInfinity;
+
+        private bool indi_off_ground()
+        {
+            var now = Time.fixedTimeAsDouble;
+            if (vessel.LandedOrSplashed())
+                indi_last_ground_time = now;
+            return now - indi_last_ground_time >= indi_liftoff_settle_time;
+        }
+
+        // Change of the step ending shift entries back from the newest
+        private static double second_difference(CircularBufferAA<float> buf, int shift)
+        {
+            return buf.GetFromTail(shift) - 2.0 * buf.GetFromTail(shift + 1) + buf.GetFromTail(shift + 2);
+        }
+
+        // The game's surface authority with the measured scale on it
+        private double indi_surface_authority()
+        {
+            return imodel.IndiSurfaceAuthority(axis) * indi_scale;
+        }
+
+        /// <summary>
+        /// Lowest damping factor incremental control divides by. Past it the vessel barely rotates at all and the
+        /// speed limit (ProgradeThrustController.max_damping_dt) is what keeps it out of there, so this sits below
+        /// the factor that limit allows.
+        /// </summary>
+        public float indi_min_damping_factor = FlightModel.MinAngularDampingFactor;
+
+        private float indi_damping_factor()
+        {
+            return Mathf.Max(indi_min_damping_factor, imodel.AngularDampingFactor);
+        }
+
+        // Torque acceleration over the step ending back steps ago: the rate change before PhysX damping took its
+        // share, w_new = f * (w_old + torque_acc * dt)
+        private double indi_torque_acc(int back)
+        {
+            var vel = imodel.AngularVelHistory(axis);
+            return (vel.GetFromTail(back) / indi_damping_factor() - vel.GetFromTail(back + 1)) / Time.fixedDeltaTime;
+        }
+
+        /// <summary>
+        /// Whether incremental control runs this step. Valid after predict_next_step.
+        /// </summary>
+        internal bool IndiActive => !double.IsNaN(DebugIndiNext);
+
+        // The coming step's torque acceleration: the latest measured one plus what the already committed surface
+        // position and direct input change. NaN when incremental control can't run.
+        protected double indi_next_torque_acc()
+        {
+            // On the ground the measured acceleration carries wheel and ground forces no surface accounts for
+            if (!indi_control || !indi_off_ground())
+                return double.NaN;
+            var surface_authority = indi_surface_authority();
+            if (double.IsNaN(surface_authority) || surface_authority <= 0.0)
+                return double.NaN;
+            var vel_history = imodel.AngularVelHistory(axis);
+            var surface = imodel.ControlSurfPosHistory(axis);
+            var input = imodel.ControlInputHistory(axis);
+            if (vel_history.Size < 2 || surface.Size < 2 || input.Size < 2)
+                return double.NaN;
+            var direct_authority = imodel.IndiDirectAuthority(axis);
+            return indi_torque_acc(0) +
+                surface_authority * (surface.GetLast() - surface.GetFromTail(1)) +
+                direct_authority * (input.GetLast() - input.GetFromTail(1));
+        }
+
+        // The coming step's net angular acceleration, PhysX damping included
+        protected double indi_next_acc()
+        {
+            var torque_acc = indi_next_torque_acc();
+            if (double.IsNaN(torque_acc))
+                return double.NaN;
+            var vel = imodel.AngularVel(axis);
+            return (indi_damping_factor() * (vel + torque_acc * Time.fixedDeltaTime) - vel) / Time.fixedDeltaTime;
+        }
+
+        // The input that takes the step after the coming one to the target acceleration, or false to fall back to
+        // the model-based law
+        protected bool indi_required_input(float target_value, out float new_input)
+        {
+            new_input = 0.0f;
+            var next = indi_next_torque_acc();
+            if (double.IsNaN(next))
+                return false;
+            // The target is a net rate change from the look-ahead rate. PhysX damps the torque's change along with
+            // the rate itself, w_after = f * (w_look + torque_acc * dt), so the torque acceleration needed is
+            var f = indi_damping_factor();
+            var dt = Time.fixedDeltaTime;
+            var target_torque_acc = target_value / f + lookahead_vel * (1.0 / f - 1.0) / dt;
+            var surface_authority = indi_surface_authority();
+            var direct_authority = imodel.IndiDirectAuthority(axis);
+            var surface = imodel.ControlSurfPos(axis);
+            var prev_input = imodel.ControlInput(axis);
+            // The surface covers lag_k of the way to the input this step. Rate-limited surfaces are taken to reach
+            // it and the measurement corrects the rest.
+            var lag_k = imodel.csurf_exponential ? imodel.csurf_lag_k : 1.0f;
+            var authority = surface_authority * lag_k + direct_authority;
+            if (authority < 1e-4)
+                return false;
+            // target = next + surface_authority * lag_k * (u - surface) + direct_authority * (u - prev_input)
+            var u = (indi_gain * (target_torque_acc - next) + surface_authority * lag_k * surface +
+                direct_authority * prev_input) / authority;
+            new_input = Common.Clampf((float)u, 1.0f);
+            indi_authority = authority * f;
+            var predicted_torque_acc = next + surface_authority * lag_k * (new_input - surface) +
+                direct_authority * (new_input - prev_input);
+            indi_predicted_acc = (f * (lookahead_vel + predicted_torque_acc * dt) - lookahead_vel) / dt;
+            return !float.IsNaN(new_input);
+        }
+
+        #endregion
+
         // Diagnostics for FlightRecorder
         internal virtual double DebugPredictedAcc => double.NaN;
         internal virtual double DebugAuthority => double.NaN;
-        // 0 = low authority fallback, 1 = exponential lag model, 2 = undelayed model, 3 = surface speed exceeded
+        // 0 = low authority fallback, 1 = exponential lag model, 2 = undelayed model, 3 = surface speed exceeded,
+        // 4 = incremental
         internal int DebugBranch;
 
         // [AutoGuiAttr("Csurf output", false, "G6")]
@@ -227,6 +487,14 @@ namespace AtmosphereAutopilotRedux.Modules
         protected override float get_required_input(AACtrlState cntrl, float target_value)
         {
             var new_input = 0.0f;
+
+            if (indi_required_input(target_value, out var indi_input))
+            {
+                DebugBranch = 4;
+                authority = indi_authority;
+                model_predicted_acc = indi_predicted_acc;
+                return indi_input;
+            }
 
             if (imodel.csurf_exponential)
             {
@@ -386,6 +654,14 @@ namespace AtmosphereAutopilotRedux.Modules
         protected override float get_required_input(AACtrlState cntrl, float target_value)
         {
             var new_input = 0.0f;
+
+            if (indi_required_input(target_value, out var indi_input))
+            {
+                DebugBranch = 4;
+                authority = indi_authority;
+                model_predicted_acc = indi_predicted_acc;
+                return indi_input;
+            }
 
             if (imodel.csurf_exponential)
             {

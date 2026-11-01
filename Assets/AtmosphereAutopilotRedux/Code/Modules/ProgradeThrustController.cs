@@ -60,6 +60,7 @@ namespace AtmosphereAutopilotRedux.Modules
         {
             imodel.Activate();
             v_integral = 0.0;
+            filtered_acc = double.NaN;
         }
 
         protected override void OnDeactivate()
@@ -120,6 +121,15 @@ namespace AtmosphereAutopilotRedux.Modules
         /// </summary>
         public double spool_time = 0.4;
 
+        /// <summary>
+        /// Time constant, s, of the low-pass on the measured acceleration the speed hold works from. At Mach 4 an
+        /// elevator kick moves the measured acceleration by up to 20 m/s^2 for a few steps; the engines can't answer
+        /// that anyway, and passed through it slammed the throttle to full and then idle.
+        /// </summary>
+        public double acc_filter_time = 0.3;
+
+        private double filtered_acc = double.NaN;
+
         private double v_integral = 0.0;
         private float last_throttle = 0.0f;
 
@@ -135,7 +145,7 @@ namespace AtmosphereAutopilotRedux.Modules
         public override float ApplyControl(AACtrlState cntrl, float target_value)
         {
             current_v = imodel.surface_v_magnitude;
-            desired_v = target_value;
+            desired_v = apply_damping_limit(target_value);
 
             // apply breaks if needed
             if (use_breaks)
@@ -183,6 +193,7 @@ namespace AtmosphereAutopilotRedux.Modules
                     pid.AccumulatorClamp = 1.0 / pid.KI;
                 }
                 cntrl.mainThrottle = Mathf.Clamp01((float)pid.Control(current_v, desired_v, Time.fixedDeltaTime));
+                filtered_acc = double.NaN;
             }
             else
             {
@@ -192,6 +203,11 @@ namespace AtmosphereAutopilotRedux.Modules
 
                 double current_acc = Vector3.Dot(imodel.sum_acc, surfspd_dir);
                 debug_current_acc = current_acc;
+                if (double.IsNaN(filtered_acc) || acc_filter_time <= 0.0)
+                    filtered_acc = current_acc;
+                else
+                    filtered_acc += (current_acc - filtered_acc) * (1.0 - Math.Exp(-Time.fixedDeltaTime / acc_filter_time));
+                current_acc = filtered_acc;
                 drag_estimate = current_acc - prograde_thrust / imodel.sum_mass - Vector3d.Dot(imodel.gravity_acc + imodel.noninert_acc, surfspd_dir);
 
                 v_error = desired_v - current_v;
@@ -293,6 +309,52 @@ namespace AtmosphereAutopilotRedux.Modules
 
         // [AutoGuiAttr("iter_count", false)]
         public int iter_count;
+
+        #region Damping speed limit
+
+        // KSP2 damps rotation by the parts' angularDrag times the dynamic pressure, and PhysX scales the angular
+        // velocity by 1 - damping * dt every step. As that nears one the vessel can't rotate at all, whatever the
+        // surfaces do. Damping grows with dynamic pressure, so with speed squared at a given air density, and the
+        // speed hold stays below the speed where it would reach max_damping_dt.
+
+        /// <summary>
+        /// Highest PhysX angular damping per step, damping * dt, the speed hold will accelerate into.
+        /// </summary>
+        public float max_damping_dt = 0.9f;
+
+        /// <summary>
+        /// How far ahead the limit looks while descending, s. The speed hold can only shed speed with drag, so the
+        /// damping is limited for the air the vessel is about to be in.
+        /// </summary>
+        public float damping_lookahead_time = 3.0f;
+
+        /// <summary>
+        /// Height over which air density changes by a factor of e near the surface, m. About Kerbin's.
+        /// </summary>
+        public float density_scale_height = 5600.0f;
+
+        /// <summary>
+        /// Speed the damping limit allows, m/s. Infinity without damping.
+        /// </summary>
+        internal double DebugEnvelopeSpeed = double.PositiveInfinity;
+
+        private float apply_damping_limit(float target)
+        {
+            double damping_dt = imodel.angular_damping * Time.fixedDeltaTime;
+            if (damping_dt <= 1e-4 || current_v < 1.0)
+            {
+                DebugEnvelopeSpeed = double.PositiveInfinity;
+                return target;
+            }
+            // Damping scales with dynamic pressure, so with density on the way down
+            var up = (vessel.ReferenceTransform.position - vessel.mainBody.position).normalized;
+            var descent = Math.Max(0.0, -Vector3d.Dot(imodel.surface_v, up)) * damping_lookahead_time;
+            damping_dt *= Math.Exp(descent / density_scale_height);
+            DebugEnvelopeSpeed = current_v * Math.Sqrt(max_damping_dt / damping_dt);
+            return (float)Math.Min(target, DebugEnvelopeSpeed);
+        }
+
+        #endregion
 
         // Diagnostics for FlightRecorder
         internal double debug_current_acc;

@@ -103,6 +103,13 @@ namespace AtmosphereAutopilotRedux.Modules
         protected float prev_input;
 
         /// <summary>
+        /// Time constant of the rate loop while the acceleration controller runs incremental control, s. In a
+        /// closed-loop simulation of the two loops, 0.1 s stays stable with the real authority anywhere from a third
+        /// to one and a half times the assumed one, and settles in about 0.3 s.
+        /// </summary>
+        public float indi_rate_time = 0.1f;
+
+        /// <summary>
         /// Main control function
         /// </summary>
         /// <param name="cntrl">Control state to change</param>
@@ -137,7 +144,17 @@ namespace AtmosphereAutopilotRedux.Modules
 
             desired_v = process_desired_v(desired_v, user_controlled);      // moderation stage
 
-            output_acc = get_desired_acc(desired_v) + target_acc;           // produce output acceleration
+            var desired_acc = get_desired_acc(desired_v);
+            if (acc_controller.IndiActive)
+            {
+                // The relaxation branch removes half the rate error in one tick, which only works with an
+                // acceleration loop that knows its authority exactly. Under incremental control the rate loop takes
+                // indi_rate_time instead, and the quadratic profile still caps large errors.
+                var linear = (desired_v - vel) / indi_rate_time;
+                if (Math.Abs(linear) < Math.Abs(desired_acc) || float.IsNaN(desired_acc))
+                    desired_acc = linear;
+            }
+            output_acc = desired_acc + target_acc;           // produce output acceleration
 
             acc_controller.ApplyControl(cntrl, output_acc);
 

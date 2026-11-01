@@ -157,6 +157,7 @@ namespace AtmosphereAutopilotRedux.Runtime
             Flag("landed", vessel.LandedOrSplashed());
             Flag("analytical", StructuralPhysicsService.IsAnalytical(vessel.View.PartOwner));
             Col("q", m.dyn_pressure);
+            Col("damp_dt", m.angular_damping * Time.fixedDeltaTime);
             Col("spd", vessel.srfSpeed);
             Col("alt", vessel.altitude);
             Col("alt_tel", vessel.Sim.AltitudeFromSeaLevel);
@@ -228,6 +229,13 @@ namespace AtmosphereAutopilotRedux.Runtime
                 prev_predicted[i] = acc.Active ? acc.DebugPredictedAcc : double.NaN;
                 Col(a + "_auth", acc.Active ? acc.DebugAuthority : double.NaN);
                 Col(a + "_branch", acc.Active ? acc.DebugBranch : -1);
+                Col(a + "_auth_an", m.DebugAnalyticAuthority(i));
+                Col(a + "_k1_an", m.DebugAnalyticStiffness(i));
+                Col(a + "_indi_next", acc.Active ? acc.DebugIndiNext : double.NaN);
+                Col(a + "_indi_scale", acc.Active ? acc.DebugIndiScale : double.NaN);
+                Col(a + "_indi_fit", acc.Active ? acc.DebugIndiScaleFit : double.NaN);
+                Col(a + "_indi_auth", acc.Active ? acc.IndiAuthority : double.NaN);
+                Col(a + "_damp_an", i == AutopilotModule.ROLL ? m.DebugAnalyticRollDamping() : double.NaN);
                 Col(a + "_cs", m.ControlSurfPos(i));
                 Col(a + "_gimbal", m.GimbalPos(i));
                 Col(a + "_aoa", m.AoA(i));
@@ -271,6 +279,8 @@ namespace AtmosphereAutopilotRedux.Runtime
             var tc = context.Speed;
             Flag("t_on", tc.spd_control_enabled);
             Col("t_set", tc.setpoint_mps);
+            Col("t_env", tc.DebugEnvelopeSpeed);
+            Col("d_vert_int", context.Director.DebugVertIntegral);
             Col("t_da", tc.DebugDesiredAcc);
             Col("t_a", tc.debug_current_acc);
             Col("t_err", tc.DebugAccError);

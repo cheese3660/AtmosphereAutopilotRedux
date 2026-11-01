@@ -74,6 +74,8 @@ namespace AtmosphereAutopilotRedux.Modules
             roll_c.Activate();
             commanded_turn_acc = Vector3d.zero;
             turn_limit_frac = 1.0;
+            vert_integral = 0.0;
+            turn_error_filter_reset = true;
             // save moderation states
             aoa_moderation_saved = pitch_c.moderate_aoa;
             sideslip_moderation_saved = yaw_c.moderate_aoa;
@@ -109,9 +111,44 @@ namespace AtmosphereAutopilotRedux.Modules
         public double turn_time = 6.0;
 
         /// <summary>
+        /// Time constant, s, of the low-pass on the heading error before it becomes a turn command.
+        /// </summary>
+        public double turn_error_filter_time = 1.0;
+
+        private Vector3d filtered_turn_error;
+        private bool turn_error_filter_reset = true;
+
+        /// <summary>
         /// Time constant, s, of vertical velocity tracking.
         /// </summary>
         public double vert_time = 1.0;
+
+        /// <summary>
+        /// Time for the vertical integral to match a steady vertical speed error, s, on top of vert_time.
+        /// </summary>
+        public double vert_integral_time = 5.0;
+
+        /// <summary>
+        /// Largest acceleration the vertical integral adds, m/s^2.
+        /// </summary>
+        public double vert_integral_limit = 2.0;
+
+        /// <summary>
+        /// Vertical speed error, m/s, beyond which the vertical integral holds still.
+        /// </summary>
+        public double vert_integral_band = 5.0;
+
+        /// <summary>
+        /// Set by the caller each step while its vertical command is still changing, to hold the vertical integral.
+        /// </summary>
+        public bool hold_vert_integral;
+
+        private double vert_integral;
+
+        /// <summary>
+        /// Vertical acceleration the integral adds, m/s^2.
+        /// </summary>
+        internal double DebugVertIntegral => vert_integral;
 
         /// <summary>
         /// Hardest turn, in g of horizontal acceleration, ever asked for.
@@ -168,8 +205,12 @@ namespace AtmosphereAutopilotRedux.Modules
             var planet2vesNorm = planet2ves.normalized;
             var shift_acc = Vector3d.zero;
 
-            // centrifugal acceleration to stay on desired altitude
-            //Vector3d level_acc = -planet2vesNorm * (imodel.surface_v - Vector3d.Project(imodel.surface_v, planet2vesNorm)).sqrMagnitude / planet2ves.magnitude;
+            // Following the planet's curve at constant altitude takes a centripetal acceleration of v^2 / r toward
+            // its centre, so level flight needs that much less lift than weight. Upstream left it out, which is fine
+            // at airliner speeds, but at Mach 4 near Kerbin's surface it is about 3.4 m/s^2, a third of g, and the
+            // altitude hold settled 10 to 13 m high asking for a descent it never got.
+            var horizontal_v = imodel.surface_v - Vector3d.Project(imodel.surface_v, planet2vesNorm);
+            var level_acc = -planet2vesNorm * horizontal_v.sqrMagnitude / planet2ves.magnitude;
 
             // Rotation vector
             var desired_turn_acc_dir = Vector3d.Cross(
@@ -196,6 +237,21 @@ namespace AtmosphereAutopilotRedux.Modules
             vel_error -= Vector3d.Project(vel_error, imodel.surface_v);      // speed is the thrust controller's job
             var vert_error = Vector3d.Project(vel_error, planet2vesNorm);
             var turn_error = vel_error - vert_error;
+            // At Mach 4 the velocity follows the nose almost rigidly, so every small yaw wiggle shows up as heading
+            // error, and V / turn_time turns it into bank: a 1 mrad yaw asked for about 2 degrees of roll. Roll then
+            // stirred the yaw again. The heading loop is slow, so it loses little to a low-pass that the wiggle
+            // can't get through.
+            if (turn_error_filter_reset || turn_error_filter_time <= 0.0)
+                filtered_turn_error = turn_error;
+            else
+            {
+                filtered_turn_error += (turn_error - filtered_turn_error) * (1.0 - Math.Exp(-dt / turn_error_filter_time));
+                // keep it horizontal and normal to the velocity as both rotate
+                filtered_turn_error -= Vector3d.Project(filtered_turn_error, planet2vesNorm);
+                filtered_turn_error -= Vector3d.Project(filtered_turn_error, imodel.surface_v);
+            }
+            turn_error_filter_reset = false;
+            turn_error = filtered_turn_error;
 
             // The turn limit shrinks while the turn bleeds speed below the speed hold setpoint, so the craft turns as
             // hard as its engines can sustain
@@ -222,9 +278,21 @@ namespace AtmosphereAutopilotRedux.Modules
             commanded_turn_acc -= Vector3d.Project(commanded_turn_acc, planet2vesNorm);
             commanded_turn_acc -= Vector3d.Project(commanded_turn_acc, imodel.surface_v);
 
-            shift_acc = commanded_turn_acc + vert_error / vert_time;
+            // A slow integral on the vertical error takes out what the lift model and the curvature term still
+            // miss, Coriolis among them. It holds still while the lift limit is in the way.
+            shift_acc = commanded_turn_acc + vert_error / vert_time + planet2vesNorm * vert_integral;
             if (shift_acc.magnitude > max_turn_acc.magnitude)
                 shift_acc *= max_turn_acc.magnitude / shift_acc.magnitude;
+            else
+            {
+                // Only while the vertical command is settled: during an altitude change the vessel trails or leads
+                // the profile by several m/s, and integrating that wound the integral end to end in a descent and
+                // bounced the level-off 15 m back up
+                var vert_speed_error = Vector3d.Dot(vert_error, planet2vesNorm);
+                if (!hold_vert_integral && Math.Abs(vert_speed_error) < vert_integral_band)
+                    vert_integral = Common.Clamp(vert_integral + vert_speed_error / (vert_time * vert_integral_time) * dt,
+                        vert_integral_limit);
+            }
 
             debug_turn_limit = turn_limit;
             debug_turn_acc = commanded_turn_acc.magnitude;
@@ -233,7 +301,7 @@ namespace AtmosphereAutopilotRedux.Modules
             //if (angular_error > 0.2 || Vector3d.Dot(desired_acceleration, shift_acc) < -0.1)
             //    target_acc = shift_acc;
             //else
-            target_acc = desired_acceleration + shift_acc;
+            target_acc = desired_acceleration + shift_acc + level_acc;
             //current_acc = imodel.sum_acc;
 
             // we need aoa moderation for AoA controllers to work
@@ -284,6 +352,18 @@ namespace AtmosphereAutopilotRedux.Modules
             desired_pitch_v = desired_pitch_acc / imodel.surface_v_magnitude;
             // let's find equilibrium AoA for desired lift
             desired_aoa = get_desired_aoa(imodel.pitch_rot_model_gen, desired_pitch_v, 0.0);
+            // The balance with the moment equation can go near singular while the learned moment terms move,
+            // and then asks for tenths of a radian out of nowhere. Lift alone, with the surfaces at their trim,
+            // says roughly where the AoA has to be, so a solution far from that is not trusted. The trim is the
+            // surface position averaged over fallback_trim_time: with the instantaneous one the target AoA
+            // followed the elevator and the elevator followed the target, an oscillation of its own.
+            update_fallback_trim();
+            var lift_only_aoa = get_lift_only_aoa(imodel.pitch_rot_model_gen, desired_pitch_v, 0.0,
+                fallback_surface_trim, fallback_gimbal_trim);
+            if (!float.IsNaN(lift_only_aoa) && !float.IsInfinity(lift_only_aoa) &&
+                (float.IsNaN(desired_aoa) || float.IsInfinity(desired_aoa) ||
+                 Math.Abs(desired_aoa - lift_only_aoa) > max_aoa_disagreement))
+                desired_aoa = lift_only_aoa;
             if (float.IsNaN(desired_aoa) || float.IsInfinity(desired_aoa))
                 desired_aoa = 0.0f;
             aoa_c.user_controlled = false;
@@ -514,6 +594,52 @@ namespace AtmosphereAutopilotRedux.Modules
                 return (float)desired_aoa;
             }
             catch (MSingularException) { return float.NaN; }
+        }
+
+        /// <summary>
+        /// Largest gap between the full equilibrium AoA and the lift-only one before the lift-only one is used,
+        /// radians.
+        /// </summary>
+        public float max_aoa_disagreement = 0.02f;
+
+        /// <summary>
+        /// Time constant of the surface and gimbal trim the lift-only AoA uses, s.
+        /// </summary>
+        public float fallback_trim_time = 1.0f;
+
+        private float fallback_surface_trim, fallback_gimbal_trim;
+        private double fallback_trim_time_stamp = double.NaN;
+
+        private void update_fallback_trim()
+        {
+            var surface = imodel.ControlSurfPos(PITCH);
+            var gimbal = imodel.GimbalPos(PITCH);
+            var now = Time.fixedTimeAsDouble;
+            if (!(now - fallback_trim_time_stamp <= 2.0 * Time.fixedDeltaTime))
+            {
+                fallback_surface_trim = surface;
+                fallback_gimbal_trim = gimbal;
+            }
+            else
+            {
+                var k = 1.0f - Mathf.Exp(-Time.fixedDeltaTime / fallback_trim_time);
+                fallback_surface_trim += (surface - fallback_surface_trim) * k;
+                fallback_gimbal_trim += (gimbal - fallback_gimbal_trim) * k;
+            }
+            fallback_trim_time_stamp = now;
+        }
+
+        // AoA the lift equation alone asks for, with the surfaces and gimbals at the given positions
+        private float get_lift_only_aoa(LinearSystemModel rotation_model, double desired_v, double desired_aoa_deriv,
+            float surface, float gimbal)
+        {
+            var lift_slope = rotation_model.A[0, 0];
+            if (Math.Abs(lift_slope) < 1e-9)
+                return float.NaN;
+            var rhs = desired_aoa_deriv - desired_v - rotation_model.C[0, 0] -
+                (rotation_model.A[0, 2] + rotation_model.B[0, 0]) * surface -
+                rotation_model.A[0, 3] * gimbal;
+            return (float)(rhs / lift_slope);
         }
 
         // [AutoGuiAttr("desired_aoa", false, "G5")]

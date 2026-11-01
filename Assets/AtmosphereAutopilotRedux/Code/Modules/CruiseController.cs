@@ -168,7 +168,10 @@ namespace AtmosphereAutopilotRedux.Modules
 
             var old_str = dir_c.strength;
             dir_c.strength *= strength_mult;
+            // The director's vertical integral is for steady error; hold it while the altitude profile is moving
+            dir_c.hold_vert_integral = desired_vert_acc.magnitude > vert_integral_settled_acc;
             dir_c.ApplyControl(cntrl, desired_velocity, level_acc + desired_vert_acc);
+            dir_c.hold_vert_integral = false;
             dir_c.strength = old_str;
         }
 
@@ -273,6 +276,36 @@ namespace AtmosphereAutopilotRedux.Modules
         public double max_vert_acc_g = 0.5;
 
         /// <summary>
+        /// Vertical acceleration, in g, for winning back a vertical speed that points away from the profile, such as
+        /// a climb still under way when altitude hold engages. At max_vert_acc_g a 190 m/s climb at Mach 4 took
+        /// almost 4 km to stop.
+        /// </summary>
+        public double capture_vert_acc_g = 1.5;
+
+        /// <summary>
+        /// Vertical speed error, m/s, over which the capture acceleration blends in from max_vert_acc_g, reaching it
+        /// at twice this.
+        /// </summary>
+        public double capture_band = 20.0;
+
+        /// <summary>
+        /// Fastest change of the commanded vertical acceleration, g per second. Without it the command flipped from
+        /// full dive to full flare in a step, and the elevator kick that took briefly jolted speed hold.
+        /// </summary>
+        public double vert_jerk_g = 1.0;
+
+        /// <summary>
+        /// Time constant, s, the vertical speed command settles onto the profile with once close to it.
+        /// </summary>
+        public double vert_settle_time = 0.5;
+
+        /// <summary>
+        /// Commanded vertical acceleration, m/s^2, under which the altitude profile counts as settled and the
+        /// director's vertical integral may run.
+        /// </summary>
+        public double vert_integral_settled_acc = 0.5;
+
+        /// <summary>
         /// Smoothing of the director's lift estimate that shapes descents, in physics steps.
         /// </summary>
         public double lift_filter_k = 20.0;
@@ -288,7 +321,8 @@ namespace AtmosphereAutopilotRedux.Modules
         private double filtered_drag = 0.0;
         private double filtered_lift = 0.0;
         private double allowed_angle = 0.0;             // rate-limited climb or dive angle limit, degrees
-        private double commanded_vert_speed = 0.0;      // rate-limited vertical speed command, m/s
+        private double commanded_vert_speed = 0.0;      // jerk-limited vertical speed command, m/s
+        private double commanded_vert_acc = 0.0;        // its rate of change, m/s^2
         private double last_height_hold_time = double.NaN;
 
         // Diagnostics for FlightRecorder: the altitude hold's last decision
@@ -316,6 +350,7 @@ namespace AtmosphereAutopilotRedux.Modules
             if (!(Time.fixedTimeAsDouble - last_height_hold_time <= 2.0 * dt))
             {
                 commanded_vert_speed = cur_vert_speed;
+                commanded_vert_acc = 0.0;
                 allowed_angle = Math.Abs(Math.Atan2(cur_vert_speed, Math.Max(1.0, vessel.horizontalSrfSpeed))) * rad2dgr;
                 filtered_lift = dir_c.max_lift_acc;
                 filtered_drag = thrust_c.drag_estimate;
@@ -363,11 +398,26 @@ namespace AtmosphereAutopilotRedux.Modules
             des_vert_speed = Common.Clamp(des_vert_speed, max_vert_speed);
 
             // Ease into the new vertical speed instead of stepping to it; its rate of change is the feed-forward,
-            // so the director is told the same acceleration the command implies
-            var prev_cmd_vert_speed = commanded_vert_speed;
-            commanded_vert_speed += Common.Clamp(des_vert_speed - commanded_vert_speed, max_vert_acc * dt);
+            // so the director is told the same acceleration the command implies. The acceleration itself changes
+            // at no more than vert_jerk_g, and eases off as the command nears the profile, sqrt(2 * jerk * error),
+            // so it arrives with none left over. Speed pointing away from the profile is won back harder.
+            var vert_speed_error = des_vert_speed - commanded_vert_speed;
+            var acc_limit = max_vert_acc;
+            if (vert_speed_error * commanded_vert_speed < 0.0 && capture_band > 0.0)
+            {
+                var capture_k = Common.Clamp((Math.Abs(vert_speed_error) - capture_band) / capture_band, 0.0, 1.0);
+                acc_limit += capture_k * Math.Max(0.0, capture_vert_acc_g * acc - max_vert_acc);
+            }
+            var jerk = vert_jerk_g * acc;
+            var abs_vert_speed_error = Math.Abs(vert_speed_error);
+            var wanted_vert_acc = Math.Min(acc_limit, Math.Sqrt(2.0 * jerk * abs_vert_speed_error));
+            if (vert_settle_time > 0.0)
+                wanted_vert_acc = Math.Min(wanted_vert_acc, abs_vert_speed_error / vert_settle_time);
+            wanted_vert_acc *= Math.Sign(vert_speed_error);
+            commanded_vert_acc += Common.Clamp(wanted_vert_acc - commanded_vert_acc, jerk * dt);
+            commanded_vert_speed += commanded_vert_acc * dt;
             var res = desired_direction.normalized * vessel.horizontalSrfSpeed + planet2vesNorm * commanded_vert_speed;
-            desired_vert_acc = planet2vesNorm * ((commanded_vert_speed - prev_cmd_vert_speed) / dt);
+            desired_vert_acc = planet2vesNorm * commanded_vert_acc;
             debug_height_error = height_error;
             debug_max_climb_angle = effective_max_climb_angle;
             debug_max_vert_speed = max_vert_speed;

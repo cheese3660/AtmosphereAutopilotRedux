@@ -488,25 +488,25 @@ namespace AtmosphereAutopilotRedux.MathUtils
             gen_space_fill_k = gen_count / (float)gen_space_size;
         }
 
+        // An input counts as varied, and its coefficient gets fitted, only once it spans one step of the
+        // generalization grid. Upstream took any difference at all, so float noise on a nearly constant input was
+        // fitted, and next to the constant term that gives a coefficient of noise over noise, large and of either
+        // sign. An input that hasn't varied keeps its current coefficient.
         private void update_singularity(IList<Vector> input_list)
         {
-            for (var i = 0; i < input_count; i++)
-                inputs_changed[i] = false;
-            var changed = 0;
-            for (var i = 0; i < input_list.Count - 1; i++)
+            for (var j = 0; j < input_count; j++)
             {
-                if (changed >= input_count)
-                    break;
-                for (var j = 0; j < input_count; j++)
+                var min = double.PositiveInfinity;
+                var max = double.NegativeInfinity;
+                for (var i = 0; i < input_list.Count; i++)
                 {
-                    if (inputs_changed[j])
-                        continue;
-                    if (input_list[i][j] != input_list[i + 1][j])
-                    {
-                        inputs_changed[j] = true;
-                        changed++;
-                    }
+                    var x = input_list[i][j];
+                    if (x < min)
+                        min = x;
+                    if (x > max)
+                        max = x;
                 }
+                inputs_changed[j] = max - min > gen_triggers[j];
             }
         }
 

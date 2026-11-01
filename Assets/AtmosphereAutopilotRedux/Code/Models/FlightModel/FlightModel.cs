@@ -199,6 +199,8 @@ namespace AtmosphereAutopilotRedux.Models
             update_engine_moments();
             get_gimbal_authority();
             update_dynamics();
+            update_analytic_authority();
+            update_analytic_stiffness();
 
             if (sequential_dt)
             {
