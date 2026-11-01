@@ -31,19 +31,19 @@ namespace System.Collections.Generic
     // IList concatenator
     public class ListView<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnumerable
     {
-        List<IList<T>> lists = new List<IList<T>>();
+        private readonly List<IList<T>> _lists = new List<IList<T>>();
 
         public ListView(params IList<T>[] targets)
         {
             foreach (var target in targets)
                 if (target != null)
-                    lists.Add(target);
+                    _lists.Add(target);
         }
 
         public IEnumerator<T> GetEnumerator()
         {
-            foreach (var list in lists)
-                foreach (T x in list)
+            foreach (var list in _lists)
+                foreach (var x in list)
                     yield return x;
         }
 
@@ -56,14 +56,14 @@ namespace System.Collections.Generic
         {
             get
             {
-                int count = 0;
-                foreach (var l in lists)
+                var count = 0;
+                foreach (var l in _lists)
                     count += l.Count;
                 return count;
             }
         }
 
-        public bool IsReadOnly { get { return false; } }
+        public bool IsReadOnly => false;
 
         public void Add(T item) { throw new NotSupportedException("ListView is fixed-size"); }
 
@@ -72,7 +72,7 @@ namespace System.Collections.Generic
         public bool Contains(T item)
         {
             var comp = EqualityComparer<T>.Default;
-            for (int i = 0; i < Count; i++)
+            for (var i = 0; i < Count; i++)
                 if (comp.Equals(this[i], item))
                     return true;
             return false;
@@ -90,67 +90,67 @@ namespace System.Collections.Generic
         {
             get
             {
-                int i = get_list_index(ref index);
-                return lists[i][index];
+                var i = get_list_index(ref index);
+                return _lists[i][index];
             }
             set
             {
-                int i = get_list_index(ref index);
-                lists[i][index] = value;
+                var i = get_list_index(ref index);
+                _lists[i][index] = value;
             }
         }
 
-        int prev_query = int.MaxValue;
-        int prev_list_index = 0;
-        int prev_index_shift = 0;
+        private int _prevQuery = int.MaxValue;
+        private int _prevListIndex = 0;
+        private int _prevIndexShift = 0;
 
-        int get_list_index(ref int lin_index)
+        private int get_list_index(ref int linIndex)
         {
-            if (lists.Count == 0)
+            if (_lists.Count == 0)
                 throw new InvalidOperationException("ListView is empty");
-            int i = 0;
-            if (lin_index < prev_query)
+            var i = 0;
+            if (linIndex < _prevQuery)
             {
-                prev_query = lin_index;
-                prev_index_shift = 0;
-                while (lists[i].Count <= lin_index)
+                _prevQuery = linIndex;
+                _prevIndexShift = 0;
+                while (_lists[i].Count <= linIndex)
                 {
-                    prev_index_shift += lists[i].Count;
-                    lin_index -= lists[i].Count;
+                    _prevIndexShift += _lists[i].Count;
+                    linIndex -= _lists[i].Count;
                     i++;
-                    if (i >= lists.Count)
+                    if (i >= _lists.Count)
                         throw new InvalidOperationException("index too large");
                 }
             }
             else
             {
-                i = prev_list_index;
-                prev_query = lin_index;
-                lin_index -= prev_index_shift;
-                while (lists[i].Count <= lin_index)
+                i = _prevListIndex;
+                _prevQuery = linIndex;
+                linIndex -= _prevIndexShift;
+                while (_lists[i].Count <= linIndex)
                 {
-                    prev_index_shift += lists[i].Count;
-                    lin_index -= lists[i].Count;
+                    _prevIndexShift += _lists[i].Count;
+                    linIndex -= _lists[i].Count;
                     i++;
-                    if (i >= lists.Count)
+                    if (i >= _lists.Count)
                         throw new InvalidOperationException("index too large");
                 }
             }
-            prev_list_index = i;
+            _prevListIndex = i;
             return i;
         }
 
         public void reset_cached_index()
         {
-            prev_query = int.MaxValue;
-            prev_list_index = 0;
-            prev_index_shift = 0;
+            _prevQuery = int.MaxValue;
+            _prevListIndex = 0;
+            _prevIndexShift = 0;
         }
 
         public int IndexOf(T item)
         {
             var comp = EqualityComparer<T>.Default;
-            for (int i = 0; i < Count; i++)
+            for (var i = 0; i < Count; i++)
                 if (comp.Equals(this[i], item))
                     return i;
             return -1;
@@ -162,7 +162,7 @@ namespace System.Collections.Generic
 
         public override string ToString()
         {
-            string result = "{" + string.Join(", ", this.Select(x => x.ToString()).ToArray()) + "}";
+            var result = "{" + string.Join(", ", this.Select(x => x.ToString()).ToArray()) + "}";
             return result;
         }
     }

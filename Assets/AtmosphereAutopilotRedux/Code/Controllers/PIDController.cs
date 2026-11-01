@@ -40,55 +40,72 @@ namespace AtmosphereAutopilotRedux.Controllers
         /// <summary>
         /// Proportional gain coefficient
         /// </summary>
-        public double KP { get { return kp; } set { kp = value; } }
+        public double KP { get => kp;
+	        set => kp = value;
+        }
         protected double kp = 1.0;
 
         /// <summary>
         /// Integral gain coefficient
         /// </summary>
-        public double KI { get { return ki; } set { ki = value; } }
+        public double KI { get => ki;
+	        set => ki = value;
+        }
         protected double ki = 1.0;
 
         /// <summary>
         /// Diffirential gain coefficient
         /// </summary>
-        public double KD { get { return kd; } set { kd = value; } }
+        public double KD { get => kd;
+	        set => kd = value;
+        }
         protected double kd = 0.01;
 
         /// <summary>
         /// Maximum error, wich lets integral component to raise
         /// </summary>
-        public double IntegralClamp { get { return iclamp; } set { iclamp = value; } }
+        public double IntegralClamp { get => iclamp;
+	        set => iclamp = value;
+        }
         protected double iclamp = 1.0;
 
         /// <summary>
         /// Maximum accumulator derivative
         /// </summary>
-        public double AccumulDerivClamp { get { return adclamp; } set { adclamp = value; } }
+        public double AccumulDerivClamp { get => adclamp;
+	        set => adclamp = value;
+        }
         protected double adclamp = 1.0;
 
         /// <summary>
         /// Maximum magnitude for integral component of controller reaction
         /// </summary>
-        public double AccumulatorClamp { get { return aclamp; } set { aclamp = value; } }
+        public double AccumulatorClamp { get => aclamp;
+	        set => aclamp = value;
+        }
         protected double aclamp = 0.1;
 
         /// <summary>
         /// Accumulator gain, is multiplied on error * dt to get accumulator change
         /// </summary>
-        public double IntegralGain { get { return igain; } set { igain = value; } }
+        public double IntegralGain { get => igain;
+	        set => igain = value;
+        }
         protected double igain = 1.0;
 
 		/// <summary>
 		/// Input derivative value from the last control iteration
 		/// </summary>
-		public double InputDerivative { get { return derivative; } }
-        protected double derivative;			            // input derivative value
+		public double InputDerivative => derivative;
+
+		protected double derivative;			            // input derivative value
 
 		/// <summary>
 		/// Current accumulator value
 		/// </summary>
-        public double Accumulator { get { return i_accumulator; } set { i_accumulator = value; } }
+        public double Accumulator { get => i_accumulator;
+	        set => i_accumulator = value;
+        }
 
         // Main step variables
         protected double i_accumulator = 0.0;               // current integral accumulator state
@@ -98,16 +115,17 @@ namespace AtmosphereAutopilotRedux.Controllers
 		/// <summary>
 		/// Last error value. Error = desire - input
 		/// </summary>
-		public double LastError { get { return last_error; } }
+		public double LastError => last_error;
+
 		protected double last_error = 0.0;	
 
         public double Control(double input, double desire, double dt)
         {
-            double error = desire - input;
-            double new_dt = dt;
+            var error = desire - input;
+            var new_dt = dt;
 
             // proportional component
-            double proportional = error * kp;
+            var proportional = error * kp;
 
             // diffirential component
             if (!dt_is_constant(new_dt))
@@ -120,16 +138,16 @@ namespace AtmosphereAutopilotRedux.Controllers
             update_value_stack(input);
             if (kd != 0.0)
                 derivative = (input_stack[0] - 4 * input_stack[1] + 3 * input_stack[2]) / new_dt * 0.5;
-            double diffirential = -derivative * kd;
+            var diffirential = -derivative * kd;
 
             // integral component             
             if (ki != 0.0)
             {
-                double d_integral = Math.Abs(error) > iclamp ? 0.0 : new_dt * 0.5 * (error + last_error);       // raw diffirential
+                var d_integral = Math.Abs(error) > iclamp ? 0.0 : new_dt * 0.5 * (error + last_error);       // raw diffirential
                 d_integral = Common.Clamp(igain * d_integral, adclamp * new_dt);                                // clamp it
                 i_accumulator = Common.Clamp(i_accumulator + d_integral, aclamp);                               // accumulate
             }
-            double integral = i_accumulator * ki;
+            var integral = i_accumulator * ki;
 
             // update previous values
             last_dt = new_dt;
@@ -143,24 +161,24 @@ namespace AtmosphereAutopilotRedux.Controllers
         /// </summary>
 		public double Control(double input, double input_d, double desire, double dt)
 		{
-			double error = desire - input;
-			double new_dt = dt;
+			var error = desire - input;
+			var new_dt = dt;
 
 			// proportional component
-			double proportional = error * kp;
+			var proportional = error * kp;
 
 			// diffirential component
 			derivative = input_d;
-			double diffirential = -input_d * kd;
+			var diffirential = -input_d * kd;
 
 			// integral component       
             if (ki != 0.0)
             {
-                double d_integral = Math.Abs(error) > iclamp ? 0.0 : new_dt * 0.5 * (error + last_error);       // raw diffirential
+                var d_integral = Math.Abs(error) > iclamp ? 0.0 : new_dt * 0.5 * (error + last_error);       // raw diffirential
                 d_integral = Common.Clamp(igain * d_integral, adclamp * new_dt);                                // clamp it
                 i_accumulator = Common.Clamp(i_accumulator + d_integral, aclamp);                               // accumulate
             }
-			double integral = i_accumulator * ki;
+			var integral = i_accumulator * ki;
 
 			// update previous values
 			last_dt = new_dt;
@@ -186,7 +204,7 @@ namespace AtmosphereAutopilotRedux.Controllers
 
         protected void clean_value_stack(double fill_value)      // need to clean value stack
         {
-            for (int i = 0; i < 3; i++)
+            for (var i = 0; i < 3; i++)
                 input_stack[i] = fill_value;
         }
 

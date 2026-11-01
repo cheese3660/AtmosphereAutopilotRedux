@@ -28,14 +28,14 @@ namespace System.Collections.Generic
 {
     public class CircularBufferAA<T> : IList<T>, ICollection<T>, IEnumerable<T>, ICollection, IEnumerable
     {
-        private int capacity;       // underlying array size
-        private int size;           // current count of elements
-        private int head;           // index of first element
-        private int tail;           // index of element behind the last one
-        private T[] buffer;         // underlying array
+        private int _capacity;       // underlying array size
+        private int _size;           // current count of elements
+        private int _head;           // index of first element
+        private int _tail;           // index of element behind the last one
+        private T[] _buffer;         // underlying array
 
         [NonSerialized]
-        private object syncRoot;
+        private object _syncRoot;
 
         public CircularBufferAA(int capacity) : this(capacity, false) { }
 
@@ -45,17 +45,17 @@ namespace System.Collections.Generic
                 throw new ArgumentException("capacity must be greater than zero.",
                     "capacity");
 
-            this.capacity = capacity;
-            size = 0;
-            head = 0;
-            tail = 0;
-            buffer = new T[capacity];
+            _capacity = capacity;
+            _size = 0;
+            _head = 0;
+            _tail = 0;
+            _buffer = new T[capacity];
             AllowOverflow = allowOverflow;
         }
 
-        public CircularBufferAA(int capacity, bool allowOverflow, T first_value) : this(capacity, allowOverflow)
+        public CircularBufferAA(int capacity, bool allowOverflow, T firstValue) : this(capacity, allowOverflow)
         {
-            Put(first_value);   
+            Put(firstValue);   
         }
 
         public bool AllowOverflow
@@ -66,43 +66,40 @@ namespace System.Collections.Generic
 
         public int Capacity
         {
-            get { return capacity; }
+            get => _capacity;
             set
             {
-                if (value == capacity)
+                if (value == _capacity)
                     return;
 
-                if (value < size)
+                if (value < _size)
                     throw new ArgumentOutOfRangeException("value",
                         "value must be greater than or equal to the buffer size.");
 
                 var dst = new T[value];
-                if (size > 0)
+                if (_size > 0)
                     CopyTo(dst);
-                buffer = dst;
+                _buffer = dst;
 
-                capacity = value;
+                _capacity = value;
             }
         }
 
-        public int Size
-        {
-            get { return size; }
-        }
+        public int Size => _size;
 
         public bool Contains(T item)
         {
-            int bufferIndex = head;
+            var bufferIndex = _head;
             var comparer = EqualityComparer<T>.Default;
-            for (int i = 0; i < size; i++, bufferIndex++)
+            for (var i = 0; i < _size; i++, bufferIndex++)
             {
-                if (bufferIndex == capacity)
+                if (bufferIndex == _capacity)
                     bufferIndex = 0;
 
-                if (item == null && buffer[bufferIndex] == null)
+                if (item == null && _buffer[bufferIndex] == null)
                     return true;
-                else if ((buffer[bufferIndex] != null) &&
-                    comparer.Equals(buffer[bufferIndex], item))
+                else if ((_buffer[bufferIndex] != null) &&
+                    comparer.Equals(_buffer[bufferIndex], item))
                     return true;
             }
 
@@ -111,9 +108,9 @@ namespace System.Collections.Generic
 
         public void Clear()
         {
-            size = 0;
-            head = 0;
-            tail = 0;
+            _size = 0;
+            _head = 0;
+            _tail = 0;
         }
 
         public int Put(T[] src)
@@ -123,67 +120,67 @@ namespace System.Collections.Generic
 
         public int Put(T[] src, int offset, int count)
         {
-            int realCount = AllowOverflow ? count : Math.Min(count, capacity - size);
-            int srcIndex = offset;
-            for (int i = 0; i < realCount; i++, srcIndex++)
+            var realCount = AllowOverflow ? count : Math.Min(count, _capacity - _size);
+            var srcIndex = offset;
+            for (var i = 0; i < realCount; i++, srcIndex++)
             {
-                if (tail == capacity)
-                    tail = 0;
-                buffer[tail] = src[srcIndex];
-                tail = (tail + 1) % capacity;
+                if (_tail == _capacity)
+                    _tail = 0;
+                _buffer[_tail] = src[srcIndex];
+                _tail = (_tail + 1) % _capacity;
             }
-            size = Math.Min(size + realCount, capacity);
+            _size = Math.Min(_size + realCount, _capacity);
             return realCount;
         }
 
         public void Put(T item)
         {
-            if (size >= capacity)
+            if (_size >= _capacity)
                 if (!AllowOverflow)
                     throw new IndexOutOfRangeException("Buffer is full.");
                 else 
                 {
-                    buffer[tail] = item;
-                    tail = (tail + 1) % capacity;
-                    head = tail;
+                    _buffer[_tail] = item;
+                    _tail = (_tail + 1) % _capacity;
+                    _head = _tail;
                     return;
                 }
-            size++;
-            buffer[tail] = item;
-            tail = (tail + 1) % capacity;
+            _size++;
+            _buffer[_tail] = item;
+            _tail = (_tail + 1) % _capacity;
         }
 
-        public T getWritingCell()
+        public T GetWritingCell()
         {
-            return buffer[tail];
+            return _buffer[_tail];
         }
 
-        public T getFromTail(int shift)
+        public T GetFromTail(int shift)
         {
-            if (shift >= size)
-                throw new IndexOutOfRangeException("shift >= size = " + size.ToString());
-            return buffer[capacity - 1 - ((capacity - tail + shift) % capacity)];
+            if (shift >= _size)
+                throw new IndexOutOfRangeException("shift >= size = " + _size.ToString());
+            return _buffer[_capacity - 1 - ((_capacity - _tail + shift) % _capacity)];
         }
 
         public T this[int index]
         {
-            get { return buffer[(index + head) % capacity]; }
-            set { buffer[(index + head) % capacity] = value; }
+            get => _buffer[(index + _head) % _capacity];
+            set => _buffer[(index + _head) % _capacity] = value;
         }
 
-        public T getLast()
+        public T GetLast()
         {
-            if (size <= 0)
-                return buffer[0];
+            if (_size <= 0)
+                return _buffer[0];
             else
-                return this[size - 1];
+                return this[_size - 1];
         }
 
         public void Skip(int count)
         {
-            head += count;
-            if (head >= capacity)
-                head -= capacity;
+            _head += count;
+            if (_head >= _capacity)
+                _head -= _capacity;
         }
 
         public T[] Get(int count)
@@ -200,27 +197,27 @@ namespace System.Collections.Generic
 
         public int Get(T[] dst, int offset, int count)
         {
-            int realCount = Math.Min(count, size);
-            int dstIndex = offset;
-            for (int i = 0; i < realCount; i++, head++, dstIndex++)
+            var realCount = Math.Min(count, _size);
+            var dstIndex = offset;
+            for (var i = 0; i < realCount; i++, _head++, dstIndex++)
             {
-                if (head == capacity)
-                    head = 0;
-                dst[dstIndex] = buffer[head];
+                if (_head == _capacity)
+                    _head = 0;
+                dst[dstIndex] = _buffer[_head];
             }
-            size -= realCount;
+            _size -= realCount;
             return realCount;
         }
 
         public T Get()
         {
-            if (size == 0)
+            if (_size == 0)
                 throw new InvalidOperationException("Buffer is empty.");
 
-            var item = buffer[head];
-            if (++head == capacity)
-                head = 0;
-            size--;
+            var item = _buffer[_head];
+            if (++_head == _capacity)
+                _head = 0;
+            _size--;
             return item;
         }
 
@@ -231,44 +228,44 @@ namespace System.Collections.Generic
 
         public void CopyTo(T[] array, int arrayIndex)
         {
-            CopyTo(0, array, arrayIndex, size);
+            CopyTo(0, array, arrayIndex, _size);
         }
 
         public void CopyTo(int index, T[] array, int arrayIndex, int count)
         {
-            if (count > size)
+            if (count > _size)
                 throw new ArgumentOutOfRangeException("count",
                     "count cannot be greater than the buffer size.");
 
-            int bufferIndex = head;
-            for (int i = 0; i < count; i++, bufferIndex++, arrayIndex++)
+            var bufferIndex = _head;
+            for (var i = 0; i < count; i++, bufferIndex++, arrayIndex++)
             {
-                if (bufferIndex == capacity)
+                if (bufferIndex == _capacity)
                     bufferIndex = 0;
-                array[arrayIndex] = buffer[bufferIndex];
+                array[arrayIndex] = _buffer[bufferIndex];
             }
         }
 
         public IEnumerator<T> GetEnumerator()
         {
-            int bufferIndex = head;
-            for (int i = 0; i < size; i++, bufferIndex++)
+            var bufferIndex = _head;
+            for (var i = 0; i < _size; i++, bufferIndex++)
             {
-                if (bufferIndex == capacity)
+                if (bufferIndex == _capacity)
                     bufferIndex = 0;
 
-                yield return buffer[bufferIndex];
+                yield return _buffer[bufferIndex];
             }
         }
 
         public T[] GetBuffer()
         {
-            return buffer;
+            return _buffer;
         }
 
         public T[] ToArray()
         {
-            var dst = new T[size];
+            var dst = new T[_size];
             CopyTo(dst);
             return dst;
         }
@@ -277,16 +274,16 @@ namespace System.Collections.Generic
 
         public int IndexOf(T item)
         {
-            int bufferIndex = head;
+            var bufferIndex = _head;
             var comparer = EqualityComparer<T>.Default;
-            for (int i = 0; i < size; i++, bufferIndex++)
+            for (var i = 0; i < _size; i++, bufferIndex++)
             {
-                if (bufferIndex == capacity)
+                if (bufferIndex == _capacity)
                     bufferIndex = 0;
-                if (item == null && buffer[bufferIndex] == null)
+                if (item == null && _buffer[bufferIndex] == null)
                     return bufferIndex;
-                else if ((buffer[bufferIndex] != null) &&
-                    comparer.Equals(buffer[bufferIndex], item))
+                else if ((_buffer[bufferIndex] != null) &&
+                    comparer.Equals(_buffer[bufferIndex], item))
                     return bufferIndex;
             }
             return -1;
@@ -294,13 +291,13 @@ namespace System.Collections.Generic
 
         public void Insert(int index, T item)
         {
-            if (index > size || index < 0)
+            if (index > _size || index < 0)
                 throw new ArgumentOutOfRangeException("index", "CircularBufferAA Insert at index > size");
-            if (index == size)
+            if (index == _size)
                 Put(item);
             else
             {
-                for (int i = 0; i < index; i++)
+                for (var i = 0; i < index; i++)
                     this[i] = this[i + 1];
                 this[index] = item;
             }
@@ -308,30 +305,24 @@ namespace System.Collections.Generic
 
         public void RemoveAt(int index)
         {
-            if (index >= size || index < 0)
+            if (index >= _size || index < 0)
                 throw new ArgumentOutOfRangeException("index", "CircularBufferAA RemoveAt index >= size");
-            if (index != size -1)
+            if (index != _size -1)
             {
-                for (int i = index; i < size; i++)
+                for (var i = index; i < _size; i++)
                     this[i] = this[i + 1];
             }
-            tail = (tail - 1 + capacity) % capacity;
-            size--;
+            _tail = (_tail - 1 + _capacity) % _capacity;
+            _size--;
         }
 
         #endregion
 
         #region ICollection<T> Members
 
-        int ICollection<T>.Count
-        {
-            get { return Size; }
-        }
+        int ICollection<T>.Count => Size;
 
-        bool ICollection<T>.IsReadOnly
-        {
-            get { return false; }
-        }
+        bool ICollection<T>.IsReadOnly => false;
 
         void ICollection<T>.Add(T item)
         {
@@ -340,7 +331,7 @@ namespace System.Collections.Generic
 
         bool ICollection<T>.Remove(T item)
         {
-            if (size == 0)
+            if (_size == 0)
                 return false;
 
             Get();
@@ -360,23 +351,17 @@ namespace System.Collections.Generic
 
         #region ICollection Members
 
-        int ICollection.Count
-        {
-            get { return Size; }
-        }
+        int ICollection.Count => Size;
 
-        bool ICollection.IsSynchronized
-        {
-            get { return false; }
-        }
+        bool ICollection.IsSynchronized => false;
 
         object ICollection.SyncRoot
         {
             get
             {
-                if (syncRoot == null)
-                    Interlocked.CompareExchange(ref syncRoot, new object(), null);
-                return syncRoot;
+                if (_syncRoot == null)
+                    Interlocked.CompareExchange(ref _syncRoot, new object(), null);
+                return _syncRoot;
             }
         }
 

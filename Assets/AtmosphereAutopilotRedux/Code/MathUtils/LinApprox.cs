@@ -48,8 +48,8 @@ namespace AtmosphereAutopilotRedux.MathUtils
         {
             lock (tpars)
             {
-                double res = pars[0];
-                for (int i = 0; i < input_count; i++)
+                var res = pars[0];
+                for (var i = 0; i < input_count; i++)
                     res += pars[i + 1] * input[i];
                 return res;
             }
@@ -57,15 +57,15 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
         public double eval_training(Vector input)
         {
-            double res = tpars[0];
-            for (int i = 0; i < input_count; i++)
+            var res = tpars[0];
+            for (var i = 0; i < input_count; i++)
                 res += tpars[i + 1] * input[i];
             return res;
         }
 
         internal readonly double[] tpars;                   // training linear koefficients
 
-        volatile bool updated_flag = false;                 // is set to true when training parameters are ready
+        private volatile bool updated_flag = false;                 // is set to true when training parameters are ready
 
         public void update_from_training()
         {
@@ -83,8 +83,8 @@ namespace AtmosphereAutopilotRedux.MathUtils
         {
             updated_flag = true;
         }
-        
-        Matrix X, Y, XtW, XtWX, XtWY;                       // matrix storages
+
+        private Matrix X, Y, XtW, XtWX, XtWY;                       // matrix storages
 
         public void preallocate(int expected_input_count)
         {
@@ -97,21 +97,21 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
         public bool weighted_lsqr(IList<Vector> inputs, IList<double> outputs, IList<double> weights, bool[] inputs_varied)
         {
-            int icount = inputs.Count;
-            int params_varied = 1;
-            for (int i = 0; i < input_count; i++)
+            var icount = inputs.Count;
+            var params_varied = 1;
+            for (var i = 0; i < input_count; i++)
                 if (inputs_varied[i])
                     params_varied++;
             
             // fill X and Y matrix
             Matrix.Realloc(icount, params_varied, ref X);
             Matrix.Realloc(icount, 1, ref Y);
-            for (int i = 0; i < icount; i++)
+            for (var i = 0; i < icount; i++)
             {
                 X[i, 0] = 1.0;
                 Y[i, 0] = outputs[i];
-                int j = 0;
-                for (int input = 0; input < input_count; input++)
+                var j = 0;
+                for (var input = 0; input < input_count; input++)
                     if (inputs_varied[input])
                     {
                         j++;
@@ -123,20 +123,20 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
             Matrix.Transpose(X, ref XtW);
             // Multiply Xt on W (diagonal matrix of weights)
-            for (int col = 0; col < XtW.cols; col++)
-                for (int row = 0; row < XtW.rows; row++)
+            for (var col = 0; col < XtW.cols; col++)
+                for (var row = 0; row < XtW.rows; row++)
                     XtW[row, col] = XtW[row, col] * weights[col];
             Matrix.Multiply(XtW, X, ref XtWX);
             Matrix.Multiply(XtW, Y, ref XtWY);
             try
             {
-                Matrix new_params = XtWX.SolveWith(XtWY);
+                var new_params = XtWX.SolveWith(XtWY);
                 lock (tpars)
                 {
                     // update training parameters
                     tpars[0] = new_params[0, 0];
-                    int j = 0;
-                    for (int input = 0; input < input_count; input++)
+                    var j = 0;
+                    for (var input = 0; input < input_count; input++)
                         if (inputs_varied[input])
                         {
                             j++;

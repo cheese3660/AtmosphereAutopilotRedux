@@ -49,9 +49,9 @@ namespace AtmosphereAutopilotRedux.Utils
                 storage = new T[capacity];
         }
 
-        public static Quaternion normalizeQuaternion(Quaternion quat)
+        public static Quaternion NormalizeQuaternion(Quaternion quat)
         {
-            float n = (float)Math.Sqrt(quat.x * quat.x + quat.y * quat.y + quat.z * quat.z + quat.w * quat.w);
+            var n = (float)Math.Sqrt(quat.x * quat.x + quat.y * quat.y + quat.z * quat.z + quat.w * quat.w);
             quat.x /= n;
             quat.y /= n;
             quat.z /= n;
@@ -64,9 +64,9 @@ namespace AtmosphereAutopilotRedux.Utils
         /// </summary>
         /// <param name="q">Rotation</param>
         /// <returns>Transformation matrix representing rotation</returns>
-        public static void rotationMatrix(Quaternion q, Matrix mat)
+        public static void RotationMatrix(Quaternion q, Matrix mat)
         {
-            q = normalizeQuaternion(q);
+            q = NormalizeQuaternion(q);
             mat[0, 0] = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
             mat[1, 0] = 2.0f * (q.x * q.y + q.z * q.w);
             mat[2, 0] = 2.0f * (q.x * q.z - q.y * q.w);
@@ -78,53 +78,53 @@ namespace AtmosphereAutopilotRedux.Utils
             mat[2, 2] = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
         }
 
-        public static double simple_filter(double new_value, double old_value, double k)
+        public static double simple_filter(double newValue, double oldValue, double k)
         {
-            return (old_value * k + new_value) / (k + 1.0);
+            return (oldValue * k + newValue) / (k + 1.0);
         }
 
-        public static double lerp(double a, double b, double k)
+        public static double Lerp(double a, double b, double k)
         {
-            k = Common.Clamp(k, 1.0);
+            k = Clamp(k, 1.0);
             return a * (1.0 - k) + b * k;
         }
 
-        public static Vector3 divideVector(Vector3 lhs, Vector3 rhs)
+        public static Vector3 DivideVector(Vector3 lhs, Vector3 rhs)
         {
-            Vector3 result = new Vector3(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
+            var result = new Vector3(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
             return result;
         }
 
         public static double Meansqr(this ICollection<double> col)
         {
-            double sqr_sum = 0.0;
-            foreach (double i in col)
-                sqr_sum += i * i;
-            return sqr_sum / col.Count;
+            var sqrSum = 0.0;
+            foreach (var i in col)
+                sqrSum += i * i;
+            return sqrSum / col.Count;
         }
 
         public static double Meansqr(this ICollection<double> col, int count, ICollection<double> weights = null)
         {
-            double sqr_sum = 0.0;
-            int r_count = 0;
+            var sqrSum = 0.0;
+            var rCount = 0;
             var en = col.GetEnumerator();
             IEnumerator<double> wen = null;
             if (weights != null)
                 wen = weights.GetEnumerator();
-            while (r_count < count)
+            while (rCount < count)
             {
                 if (en.MoveNext())
                 {
-                    r_count++;
-                    double val = en.Current;
+                    rCount++;
+                    var val = en.Current;
                     if (wen != null && wen.MoveNext())
                         val *= wen.Current;             
-                    sqr_sum += val * val;
+                    sqrSum += val * val;
                 }
                 else
                     break;
             }
-            return sqr_sum / (double)r_count;
+            return sqrSum / (double)rCount;
         }
 
         public static int Clamp(int val, int under, int upper)
@@ -176,12 +176,12 @@ namespace AtmosphereAutopilotRedux.Utils
             return (y2 - y0) / dt * 0.5;
         }
 
-        public static double derivative1(double y0, double y1, double y2, double dt)    // first derivative
+        public static double Derivative1(double y0, double y1, double y2, double dt)    // first derivative
         {
             return (y0 - 4 * y1 + 3 * y2) / dt * 0.5;
         }
 
-        public static double derivative2(double y0, double y1, double y2, double dt)    // second derivative
+        public static double Derivative2(double y0, double y1, double y2, double dt)    // second derivative
         {
             return (y0 - 2 * y1 + y2) / dt / dt;
         }
@@ -191,7 +191,7 @@ namespace AtmosphereAutopilotRedux.Utils
             return (-y0 + 4 * y1 - 5 * y2 + 2 * y3) / dt / dt;
         }
 
-        public static double extrapolate(double y0, double dy1, double dy2, double dt)
+        public static double Extrapolate(double y0, double dy1, double dy2, double dt)
         {
             return y0 + dy1 * dt + 0.5 * dy2 * dt * dt;
         }

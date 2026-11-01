@@ -14,7 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: addressables_AtmosphereAutopilotRedux_all
   m_GUID: 816b159548da02a4eb52cc885e4a9582
-  m_SerializeEntries: []
+  m_SerializeEntries:
+  - m_GUID: 2c3959aec8b420545a4a1fdfa81f8418
+    m_Address: Assets/AtmosphereAutopilotRedux/UI/MainWindow/AtmosphereAutopilotWindow.uxml
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - aa-ui
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ec2635676d26218468f045b40c220972
+    m_Address: Assets/AtmosphereAutopilotRedux/UI/icon.png
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - aa-ui
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: b2dbbe24f697c13418655e19b4529363, type: 2}
   m_SchemaSet:

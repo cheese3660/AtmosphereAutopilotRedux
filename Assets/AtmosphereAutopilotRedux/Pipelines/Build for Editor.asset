@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-9207158201647931882
+--- !u!114 &-5144526542106480368
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -13,20 +13,7 @@ MonoBehaviour:
   m_Name: BakeModAssets
   m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.BakeModAssets
   Active: 1
---- !u!114 &-4859433207718527074
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ad179729e04b422daea3ee07de05152c, type: 3}
-  m_Name: StageGeneratedTextAssets
-  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.StageGeneratedTextAssets
-  Active: 1
---- !u!114 &-2920999670355745243
+--- !u!114 &-4096285866627367224
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -39,7 +26,53 @@ MonoBehaviour:
   m_Name: StageFolder
   m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.StageFolder
   Active: 1
---- !u!114 &-2219955032473597313
+--- !u!114 &-2675028810987170266
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad179729e04b422daea3ee07de05152c, type: 3}
+  m_Name: StageGeneratedTextAssets
+  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.StageGeneratedTextAssets
+  Active: 1
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3695521163bdd74fa2845bbd3438240, type: 3}
+  m_Name: Build for Editor
+  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Pipelines.Pipeline
+  Data:
+  - {fileID: -5144526542106480368}
+  - {fileID: -4096285866627367224}
+  - {fileID: -2675028810987170266}
+  - {fileID: 1876376580910264078}
+  - {fileID: 4924048653520024154}
+  QuickAccess: 0
+  manifest: {fileID: 11400000, guid: d3cb16a3ef6fdab41bdea936895dfdf3, type: 2}
+--- !u!114 &1876376580910264078
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c82edc414f9e434d88dd0d7a70ed5cb5, type: 3}
+  m_Name: StageAddressablesGroups
+  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.StageAddressablesGroups
+  Active: 1
+--- !u!114 &4924048653520024154
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -56,36 +89,3 @@ MonoBehaviour:
   releaseBuild: 1
   assemblyArtifactPath: <AssemblyStaging>
   buildTarget: 5
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a3695521163bdd74fa2845bbd3438240, type: 3}
-  m_Name: Build for Editor
-  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Pipelines.Pipeline
-  Data:
-  - {fileID: -9207158201647931882}
-  - {fileID: -2920999670355745243}
-  - {fileID: -4859433207718527074}
-  - {fileID: 461525056491248305}
-  - {fileID: -2219955032473597313}
-  QuickAccess: 0
-  manifest: {fileID: 11400000, guid: d3cb16a3ef6fdab41bdea936895dfdf3, type: 2}
---- !u!114 &461525056491248305
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c82edc414f9e434d88dd0d7a70ed5cb5, type: 3}
-  m_Name: StageAddressablesGroups
-  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.StageAddressablesGroups
-  Active: 1

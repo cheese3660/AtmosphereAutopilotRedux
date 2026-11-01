@@ -33,9 +33,9 @@ namespace AtmosphereAutopilotRedux.MathUtils
     /// </summary>
     public class VectorArray
     {
-        int vector_size;
-        int capacity;
-        int data_size;
+        private int vector_size;
+        private int capacity;
+        private int data_size;
 
         public VectorArray(int vsize, int capacity)
         {
@@ -53,8 +53,8 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
         public Vector this[int index]
         {
-            get { return new Vector(this, index); }
-            set { value.DeepCopy(this[index]); }
+            get => new(this, index);
+            set => value.DeepCopy(this[index]);
         }
 
         public void Resize(int new_capacity)
@@ -68,8 +68,8 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
         public struct Vector
         {
-            VectorArray source;
-            int index;
+            private VectorArray source;
+            private int index;
 
             public Vector(int size)
             {
@@ -85,31 +85,31 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
             public static implicit operator Vector(double[] arr)
             {
-                int dim = arr.Length;
-                VectorArray a = new VectorArray(dim, 1);
-                Vector v = a[0];
-                for (int i = 0; i < dim; i++)
+                var dim = arr.Length;
+                var a = new VectorArray(dim, 1);
+                var v = a[0];
+                for (var i = 0; i < dim; i++)
                     v[i] = arr[i];
                 return v;
             }
 
             public static implicit operator Vector(double val)
             {
-                VectorArray a = new VectorArray(1, 1);
-                Vector v = a[0];
+                var a = new VectorArray(1, 1);
+                var v = a[0];
                 v[0] = val;
                 return v;
             }
 
             public double this[int proj]
             {
-                get { return source.data[index * source.vector_size + proj]; }
-                set { source.data[index * source.vector_size + proj] = value; }
+                get => source.data[index * source.vector_size + proj];
+                set => source.data[index * source.vector_size + proj] = value;
             }
 
             public void DeepCopy(Vector dest)
             {
-                for (int i = 0; i < source.vector_size; i++)
+                for (var i = 0; i < source.vector_size; i++)
                     dest[i] = this[i];
             }
 
@@ -123,8 +123,8 @@ namespace AtmosphereAutopilotRedux.MathUtils
                         return this[0].ToString("G6");
                     else
                     {
-                        string result = "{";
-                        for (int i = 0; i < source.vector_size; i++)
+                        var result = "{";
+                        for (var i = 0; i < source.vector_size; i++)
                             if (i != source.vector_size - 1)
                                 result += this[i].ToString("G6") + ", ";
                             else
@@ -145,8 +145,8 @@ namespace AtmosphereAutopilotRedux.MathUtils
                         return this[0].ToString(format);
                     else
                     {
-                        string result = "{";
-                        for (int i = 0; i < source.vector_size; i++)
+                        var result = "{";
+                        for (var i = 0; i < source.vector_size; i++)
                             if (i != source.vector_size - 1)
                                 result += this[i].ToString(format) + ", ";
                             else
@@ -176,24 +176,24 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
             public Vector Scale(double s)
             {
-                for (int i = 0; i < source.vector_size; i++)
+                for (var i = 0; i < source.vector_size; i++)
                     this[i] *= s;
                 return this;
             }
 
             public Vector InverseScale(IList<double> s)
             {
-                for (int i = 0; i < source.vector_size; i++)
+                for (var i = 0; i < source.vector_size; i++)
                     this[i] /= s[i];
                 return this;
             }
 
             public static double SqrLength(Vector a, Vector b)
             {
-                double res = 0.0;
-                for (int i = 0; i < a.source.vector_size; i++)
+                var res = 0.0;
+                for (var i = 0; i < a.source.vector_size; i++)
                 {
-                    double proj = a[i] - b[i];
+                    var proj = a[i] - b[i];
                     res += proj * proj;
                 }
                 return res;
@@ -201,22 +201,22 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
             public static void Add(Vector a, Vector b, Vector res)
             {
-                for (int i = 0; i < a.source.vector_size; i++)
+                for (var i = 0; i < a.source.vector_size; i++)
                     res[i] = a[i] + b[i];
             }
 
             public static void Sub(Vector a, Vector b, Vector res)
             {
-                for (int i = 0; i < a.source.vector_size; i++)
+                for (var i = 0; i < a.source.vector_size; i++)
                     res[i] = a[i] - b[i];
             }
 
             public double SqrLength()
             {
-                double res = 0.0;
-                for (int i = 0; i < source.vector_size; i++)
+                var res = 0.0;
+                for (var i = 0; i < source.vector_size; i++)
                 {
-                    double proj = this[i];
+                    var proj = this[i];
                     res += proj * proj;
                 }
                 return res;

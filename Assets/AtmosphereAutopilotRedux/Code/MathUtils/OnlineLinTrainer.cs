@@ -37,43 +37,45 @@ namespace AtmosphereAutopilotRedux.MathUtils
         // Buffers, that will be updated by calls from Unity event cycle
 
         // Immediate buffer
-        CircularBufferAA<Vector> imm_buf_inputs;
-        VectorArray imm_buf_vectors;
-        CircularBufferAA<double> imm_buf_outputs;
+        private CircularBufferAA<Vector> imm_buf_inputs;
+        private VectorArray imm_buf_vectors;
+        private CircularBufferAA<double> imm_buf_outputs;
 
         // Buffers for linear regression
 
         // Immediate buffer
-        CircularBufferAA<Vector> imm_training_inputs;
-        VectorArray imm_training_vectors;
-        CircularBufferAA<double> imm_training_outputs;
+        private CircularBufferAA<Vector> imm_training_inputs;
+        private VectorArray imm_training_vectors;
+
+        private CircularBufferAA<double> imm_training_outputs;
         // Gradient buffer
-        VectorArray grad_training_vectors;
-        CircularBufferAA<GenStruct> grad_training;
+        private VectorArray grad_training_vectors;
+
+        private CircularBufferAA<GenStruct> grad_training;
         // Generalization buffer is being used as generality augmentor
-        CircularBufferAA<GenStruct>[] gen_buffers;
+        private CircularBufferAA<GenStruct>[] gen_buffers;
         // Error weight buffers
         //List<double> imm_error_weights = new List<double>();
         //List<double> grad_error_weights = new List<double>();
         //List<double> gen_error_weights = new List<double>();
 
         // Views to adapt inputs for Approximator
-        ListView<Vector> input_view;
-        ListView<double> output_view;
-        ListView<double> weight_view;
+        private ListView<Vector> input_view;
+        private ListView<double> output_view;
+        private ListView<double> weight_view;
 
         // flag of buffers update
-        volatile bool updated = false;
+        private volatile bool updated = false;
 
         // time is used for generalization measures aging
-        int cur_time = 0;
+        private int cur_time = 0;
 
         // models to train
         public readonly List<LinApproxTask> tasks = new List<LinApproxTask>();
         //public readonly LinApprox linmodel, genmodel;
-        readonly int input_count;
+        private readonly int input_count;
 
-        struct GenStruct
+        private struct GenStruct
         {
             public Vector coord;
             public double val;
@@ -103,7 +105,7 @@ namespace AtmosphereAutopilotRedux.MathUtils
             imm_buf_outputs = new CircularBufferAA<double>(imm_buf_size, true);
             imm_training_outputs = new CircularBufferAA<double>(imm_buf_size, true);
             // bind vectors in circular buffers to vector arrays
-            for (int i = 0; i < imm_buf_size; i++)
+            for (var i = 0; i < imm_buf_size; i++)
             {
                 imm_buf_inputs[i] = imm_buf_vectors[i];
                 imm_training_inputs[i] = imm_training_vectors[i];
@@ -114,12 +116,12 @@ namespace AtmosphereAutopilotRedux.MathUtils
             this.gen_triggers = gen_triggers;
             gen_space_size = 0;
             gen_buffers = new CircularBufferAA<GenStruct>[input_count];
-            for (int i = 0; i < input_count; i++)
+            for (var i = 0; i < input_count; i++)
             {
                 gen_buffers[i] = new CircularBufferAA<GenStruct>(gen_buf_sizes[i], true);
                 gen_space_size += gen_buf_sizes[i];
-                VectorArray gen_array = new VectorArray(input_count, gen_buf_sizes[i]);
-                for (int j = 0; j < gen_buf_sizes[i]; j++)
+                var gen_array = new VectorArray(input_count, gen_buf_sizes[i]);
+                for (var j = 0; j < gen_buf_sizes[i]; j++)
                     gen_buffers[i][j] = new GenStruct(0.0, 0, gen_array[j]);
             }
             // Delegates assignment
@@ -173,15 +175,15 @@ namespace AtmosphereAutopilotRedux.MathUtils
             updated = true;
         }
 
-        Action<Vector> input_update_dlg;                // new state input getter
-        Func<double> output_update_dlg;                 // new state output getter
+        private Action<Vector> input_update_dlg;                // new state input getter
+        private Func<double> output_update_dlg;                 // new state output getter
 
-        void update_immediate_buffer()
+        private void update_immediate_buffer()
         {
             lock (imm_buf_inputs)
             {
                 // inputs
-                Vector input = imm_buf_inputs.getWritingCell();
+                var input = imm_buf_inputs.GetWritingCell();
                 input_update_dlg(input);
                 imm_buf_inputs.Put(input);
                 // outputs
@@ -193,8 +195,8 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
         #region TrainingThread
 
-        bool[] nothing_changed;
-        bool[] reassigned;
+        private bool[] nothing_changed;
+        private bool[] reassigned;
 
         public void Train()
         {
@@ -213,12 +215,12 @@ namespace AtmosphereAutopilotRedux.MathUtils
                     {
                         reset_view_caches();
                         update_singularity(input_view);
-                        for (int i = 0; i < tasks.Count; i++)
+                        for (var i = 0; i < tasks.Count; i++)
                         {
-                            LinApprox linmodel = tasks[i].linmodel;
+                            var linmodel = tasks[i].linmodel;
                             set_parameters(tasks[i]);
                             linmodel.weighted_lsqr(input_view, output_view, weight_view, inputs_changed);
-                            bool redo = tasks[i].validator(inputs_changed, reassigned);
+                            var redo = tasks[i].validator(inputs_changed, reassigned);
                             if (redo)
                                 linmodel.weighted_lsqr(input_view, output_view, weight_view, reassigned);
                             if (tasks[i].zero_immediate)
@@ -239,7 +241,7 @@ namespace AtmosphereAutopilotRedux.MathUtils
         protected double max_output_value = 0.01;         // maximum absolute value of model output reached in past
 
         //[AutoGuiAttr("inputs_changed", false)]
-        readonly bool[] inputs_changed;         // flags that input has changed
+        private readonly bool[] inputs_changed;         // flags that input has changed
 
         //int added_to_imm = 0;                   // how many inputs where added to training imm_buf during last Train() call
 
@@ -249,12 +251,12 @@ namespace AtmosphereAutopilotRedux.MathUtils
         // [AutoGuiAttr("gradient_sensitivity", true, "G6")]
         public volatile float gradient_sensitivity = 0.05f;
 
-        void update_train_buf()
+        private void update_train_buf()
         {
             // There are new inputs from Unity thread
             lock (imm_buf_inputs)
             {
-                int count = imm_buf_inputs.Size;
+                var count = imm_buf_inputs.Size;
                 iteration_time = count * last_time_elapsed;
                 //added_to_imm = count;
                 while (count > 0)
@@ -263,36 +265,36 @@ namespace AtmosphereAutopilotRedux.MathUtils
                     if (imm_training_inputs.Size == imm_training_inputs.Capacity)       // if we'll be overwriting immediate buffer
                     {
                         // let's update gradient buffers if needed
-                        double cur_output = imm_training_outputs[1];
-                        double prev_output = imm_training_outputs[0];
+                        var cur_output = imm_training_outputs[1];
+                        var prev_output = imm_training_outputs[0];
                         if (Math.Abs((prev_output - cur_output) / max_output_value) >= gradient_sensitivity)
                         {
                             // we need to put the output we'll be overwriting soon into gradient buffer
-                            Vector wrt = grad_training.getWritingCell().coord;
-                            Vector v2write = imm_training_inputs[0];
+                            var wrt = grad_training.GetWritingCell().coord;
+                            var v2write = imm_training_inputs[0];
                             v2write.DeepCopy(wrt);
                             grad_training.Put(new GenStruct(imm_training_outputs[0], cur_time - imm_training_inputs.Size * last_time_elapsed, wrt));
                         }
                         // let's update generalization buffers
-                        Vector new_coord = imm_training_inputs[0];
-                        for (int j = 0; j < input_count; j++)
+                        var new_coord = imm_training_inputs[0];
+                        for (var j = 0; j < input_count; j++)
                         {
-                            int cur_add_time = cur_time - imm_training_inputs.Size * last_time_elapsed;
-                            var prev_cell = gen_buffers[j].getLast();
+                            var cur_add_time = cur_time - imm_training_inputs.Size * last_time_elapsed;
+                            var prev_cell = gen_buffers[j].GetLast();
                             if (gen_buffers[j].Size == 0 ||
                                 Math.Abs(prev_cell.coord[j] - new_coord[j]) >
                                 (gen_buffers[j].Size / (double)gen_buffers[j].Capacity) * gen_triggers[j])
                             {
-                                var cell = gen_buffers[j].getWritingCell();
+                                var cell = gen_buffers[j].GetWritingCell();
                                 new_coord.DeepCopy(cell.coord);
                                 gen_buffers[j].Put(new GenStruct(prev_output, cur_add_time, cell.coord));
                             }
                         }
                     }
-                    Vector writing_cell = imm_training_inputs.getWritingCell();
+                    var writing_cell = imm_training_inputs.GetWritingCell();
                     imm_buf_inputs.Get().DeepCopy(writing_cell);
                     imm_training_inputs.Put(writing_cell);
-                    double new_output = imm_buf_outputs.Get();
+                    var new_output = imm_buf_outputs.Get();
                     max_output_value = max_output_value * (1.0 - max_value_decay * last_time_elapsed);
                     max_output_value = Math.Max(Math.Max(max_output_value, Math.Abs(new_output)), min_output_value);
                     imm_training_outputs.Put(new_output);
@@ -303,20 +305,20 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
         public double[] gen_triggers;
 
-        ListView<GenStruct> gen_list_view;
+        private ListView<GenStruct> gen_list_view;
 
-        ListSelector<GenStruct, Vector> gen_inputs_selector;
-        ListSelector<GenStruct, double> gen_output_selector;
+        private ListSelector<GenStruct, Vector> gen_inputs_selector;
+        private ListSelector<GenStruct, double> gen_output_selector;
 
-        ListSelector<GenStruct, Vector> grad_input_selector;
-        ListSelector<GenStruct, double> grad_output_selector;
+        private ListSelector<GenStruct, Vector> grad_input_selector;
+        private ListSelector<GenStruct, double> grad_output_selector;
 
-        List<int> imm_weights_dummys = new List<int>();
-        ListSelector<int, double> imm_error_weights;
-        ListSelector<GenStruct, double> gen_error_weights;
-        ListSelector<GenStruct, double> grad_error_weights;
+        private List<int> imm_weights_dummys = new List<int>();
+        private ListSelector<int, double> imm_error_weights;
+        private ListSelector<GenStruct, double> gen_error_weights;
+        private ListSelector<GenStruct, double> grad_error_weights;
 
-        void create_views()
+        private void create_views()
         {
             gen_list_view = new ListView<GenStruct>(gen_buffers);
 
@@ -334,7 +336,7 @@ namespace AtmosphereAutopilotRedux.MathUtils
             weight_view = new ListView<double>(imm_error_weights, grad_error_weights, gen_error_weights);
         }
 
-        void reset_view_caches()
+        private void reset_view_caches()
         {
             input_view.reset_cached_index();
             output_view.reset_cached_index();
@@ -343,9 +345,9 @@ namespace AtmosphereAutopilotRedux.MathUtils
 
         // Age decay factors for weights of inputs
 
-        float weight_time_decay = 0.02f;
+        private float weight_time_decay = 0.02f;
 
-        float base_gen_weight = 0.1f;
+        private float base_gen_weight = 0.1f;
 
         //float linear_time_decay = 0.02f;
 
@@ -364,25 +366,25 @@ namespace AtmosphereAutopilotRedux.MathUtils
         public volatile float linear_param;
 
         // [AutoGuiAttr("nonlin_time", false)]
-        int nonlin_time = 0;
+        private int nonlin_time = 0;
 
         /// <summary>
         /// What approximator to use as linearity judge
         /// </summary>
         public LinApproxTask linearity_check_task;
 
-        void check_linearity()
+        private void check_linearity()
         {
             if (imm_training_inputs.Size > 0)
             {
-                double sum_error = 0.0;
-                LinApprox linmodel = linearity_check_task.linmodel;
-                for (int i = 0; i < imm_training_inputs.Size; i++)
+                var sum_error = 0.0;
+                var linmodel = linearity_check_task.linmodel;
+                for (var i = 0; i < imm_training_inputs.Size; i++)
                 {
-                    Vector input = imm_training_inputs[i];
-                    double true_output = imm_training_outputs[i];
-                    double lin_output = linmodel.eval_training(input);
-                    double scaled_err = (lin_output - true_output) / max_output_value;
+                    var input = imm_training_inputs[i];
+                    var true_output = imm_training_outputs[i];
+                    var lin_output = linmodel.eval_training(input);
+                    var scaled_err = (lin_output - true_output) / max_output_value;
                     sum_error += Math.Abs(scaled_err);
                 }
                 //for (int i = 0; i < grad_training.Size; i++)
@@ -408,7 +410,7 @@ namespace AtmosphereAutopilotRedux.MathUtils
             }
         }
 
-        void set_parameters(LinApproxTask task)
+        private void set_parameters(LinApproxTask task)
         {
             base_gen_weight = task.base_gen_weight;
             if (linear)
@@ -423,27 +425,27 @@ namespace AtmosphereAutopilotRedux.MathUtils
         // [AutoGuiAttr("nonlin_trigger", true)]
         public int nonlin_trigger = 100;
 
-        int gen_space_size;
+        private int gen_space_size;
 
-        double imm_weight_func(int index)
+        private double imm_weight_func(int index)
         {
-            int birth = cur_time - (imm_training_inputs.Size - index - 1) * last_time_elapsed;
+            var birth = cur_time - (imm_training_inputs.Size - index - 1) * last_time_elapsed;
             return getAgeWeight(birth);
         }
 
-        double gen_weight_func(GenStruct record)
+        private double gen_weight_func(GenStruct record)
         {
             return base_gen_weight * getAgeWeight(record.birth);
         }
 
-        double grad_weight_func(GenStruct record)
+        private double grad_weight_func(GenStruct record)
         {
             return getAgeWeight(record.birth);
         }
 
         //double popul_ratio = 1.0;
 
-        void update_weights()
+        private void update_weights()
         {
             // Immediate buffer error weights
             while (imm_training_inputs.Size > imm_weights_dummys.Count)
@@ -452,10 +454,10 @@ namespace AtmosphereAutopilotRedux.MathUtils
             //popul_ratio = (double)imm_training_inputs.Size / (double)gen_error_weights.Count;
         }
 
-        void clear_old_records()
+        private void clear_old_records()
         {
             // Gradient buffer cleaning
-            int k = 0;
+            var k = 0;
             while (k < grad_training.Size)
             {
                 if (linear || (cur_time - grad_training[k].birth) < nonlin_cutoff_time || nonlin_time < nonlin_trigger)
@@ -467,8 +469,8 @@ namespace AtmosphereAutopilotRedux.MathUtils
                 }
             }
             // Generalization buffer cleaning
-            int gen_count = 0;
-            for (int i = 0; i < gen_buffers.Length; i++)
+            var gen_count = 0;
+            for (var i = 0; i < gen_buffers.Length; i++)
             {
                 k = 0;
                 while (k < gen_buffers[i].Size - input_count - 2)
@@ -486,16 +488,16 @@ namespace AtmosphereAutopilotRedux.MathUtils
             gen_space_fill_k = gen_count / (float)gen_space_size;
         }
 
-        void update_singularity(IList<Vector> input_list)
+        private void update_singularity(IList<Vector> input_list)
         {
-            for (int i = 0; i < input_count; i++)
+            for (var i = 0; i < input_count; i++)
                 inputs_changed[i] = false;
-            int changed = 0;
-            for (int i = 0; i < input_list.Count - 1; i++)
+            var changed = 0;
+            for (var i = 0; i < input_list.Count - 1; i++)
             {
                 if (changed >= input_count)
                     break;
-                for (int j = 0; j < input_count; j++)
+                for (var j = 0; j < input_count; j++)
                 {
                     if (inputs_changed[j])
                         continue;
@@ -508,32 +510,32 @@ namespace AtmosphereAutopilotRedux.MathUtils
             }
         }
 
-        const int time_reset = int.MaxValue / 2;
+        private const int time_reset = int.MaxValue / 2;
 
         // [AutoGuiAttr("max age", true)]
         public volatile int max_age = 3000;
 
-        void reset_time()
+        private void reset_time()
         {
-            for (int i = 0; i < gen_buffers.Length; i++)
-                for (int j = 0; j < gen_buffers[i].Size; j++)
+            for (var i = 0; i < gen_buffers.Length; i++)
+                for (var j = 0; j < gen_buffers[i].Size; j++)
                 {
                     var cur_struct = gen_buffers[i][j];
-                    int cur_age = Math.Min(cur_time - cur_struct.birth, max_age);
+                    var cur_age = Math.Min(cur_time - cur_struct.birth, max_age);
                     gen_buffers[i][j] = new GenStruct(cur_struct.val, max_age - cur_age, cur_struct.coord);
                 }
-            for (int i = 0; i < grad_training.Size; i++)
+            for (var i = 0; i < grad_training.Size; i++)
             {
-                int cur_age = Math.Min(cur_time - grad_training[i].birth, max_age);
+                var cur_age = Math.Min(cur_time - grad_training[i].birth, max_age);
                 grad_training[i] = new GenStruct(grad_training[i].val, max_age - cur_age, grad_training[i].coord);
             }
             cur_time = max_age;
         }
 
-        double getAgeWeight(int birth)
+        private double getAgeWeight(int birth)
         {
-            int age = Math.Min(cur_time - birth, max_age);
-            double result = 1.0 / (weight_time_decay * age + 1.0);
+            var age = Math.Min(cur_time - birth, max_age);
+            var result = 1.0 / (weight_time_decay * age + 1.0);
             return result;
         }
 

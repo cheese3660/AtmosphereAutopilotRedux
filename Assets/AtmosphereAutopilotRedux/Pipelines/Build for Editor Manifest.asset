@@ -1,72 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e563561e08b6a3642a487177f5cfbb37, type: 3}
-  m_Name: Build for Editor Manifest
-  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Manifests.Manifest
-  Data:
-  - {fileID: 5655525279969050635}
-  - {fileID: 5288585833453522705}
-  - {fileID: 9164744154468878883}
-  - {fileID: 6372155323893444120}
-  identity: {fileID: 8126722413842962308}
-  QuickAccess: 0
---- !u!114 &5288585833453522705
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a089732392b94873b7dffb12543079c3, type: 3}
-  m_Name: TextAssets
-  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.TextAssets
-  StagingPaths:
-  - Assets/Mods/__Testing/AtmosphereAutopilotRedux
-  possibleFolders:
-  - Assets\AtmosphereAutopilotRedux
---- !u!114 &5655525279969050635
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 470dbf1cc5834ffc97c653aa1126938c, type: 3}
-  m_Name: CopyFolderDatum
-  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.CopyFolderDatum
-  StagingPaths: []
-  sourcePath: Assets\AtmosphereAutopilotRedux/Copied
-  destinationPath: Assets/Mods/__Testing/AtmosphereAutopilotRedux
---- !u!114 &6372155323893444120
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2b7e13dda513544419a89926bd12ad8a, type: 3}
-  m_Name: AssemblyDefinitions
-  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Manifests.Datums.AssemblyDefinitions
-  StagingPaths:
-  - Assets/Mods/__Testing/AtmosphereAutopilotRedux
-  definitions:
-  - {fileID: 5897886265953266890, guid: 9d348c538b08896459cce323924bb2f1, type: 3}
---- !u!114 &8126722413842962308
+--- !u!114 &-2445818688504585169
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -84,7 +18,41 @@ MonoBehaviour:
   Description: A sample mod for KSP2
   Version: 0.1.0
   Dependencies: []
---- !u!114 &9164744154468878883
+--- !u!114 &-940603206078022813
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 470dbf1cc5834ffc97c653aa1126938c, type: 3}
+  m_Name: CopyFolderDatum
+  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.CopyFolderDatum
+  StagingPaths: []
+  sourcePath: Assets\AtmosphereAutopilotRedux/Copied
+  destinationPath: Assets/Mods/__Testing~/AtmosphereAutopilotRedux
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e563561e08b6a3642a487177f5cfbb37, type: 3}
+  m_Name: Build for Editor Manifest
+  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Manifests.Manifest
+  Data:
+  - {fileID: -940603206078022813}
+  - {fileID: 2766611821155676438}
+  - {fileID: 1063268130744887428}
+  - {fileID: 4886110717411069442}
+  identity: {fileID: -2445818688504585169}
+  QuickAccess: 0
+--- !u!114 &1063268130744887428
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -97,6 +65,38 @@ MonoBehaviour:
   m_Name: AddressablesGroupDatum
   m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.AddressablesGroupDatum
   StagingPaths:
-  - Assets/Mods/__Testing/AtmosphereAutopilotRedux/addressables
+  - Assets/Mods/__Testing~/AtmosphereAutopilotRedux/addressables
   mod: {fileID: 11400000, guid: 655ccab01dfd3e441a3e7c9d0ba516e8, type: 2}
-  targetFolder: Assets/Mods/__Testing/AtmosphereAutopilotRedux/addressables
+  targetFolder: Assets/Mods/__Testing~/AtmosphereAutopilotRedux/addressables
+--- !u!114 &2766611821155676438
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a089732392b94873b7dffb12543079c3, type: 3}
+  m_Name: TextAssets
+  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.TextAssets
+  StagingPaths:
+  - Assets/Mods/__Testing~/AtmosphereAutopilotRedux
+  possibleFolders:
+  - Assets\AtmosphereAutopilotRedux
+--- !u!114 &4886110717411069442
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b7e13dda513544419a89926bd12ad8a, type: 3}
+  m_Name: AssemblyDefinitions
+  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Manifests.Datums.AssemblyDefinitions
+  StagingPaths:
+  - Assets/Mods/__Testing~/AtmosphereAutopilotRedux
+  definitions:
+  - {fileID: 5897886265953266890, guid: 9d348c538b08896459cce323924bb2f1, type: 3}

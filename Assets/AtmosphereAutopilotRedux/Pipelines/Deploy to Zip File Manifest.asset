@@ -1,38 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-6510833922781487842
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2b7e13dda513544419a89926bd12ad8a, type: 3}
-  m_Name: AssemblyDefinitions
-  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Manifests.Datums.AssemblyDefinitions
-  StagingPaths:
-  - Deploy/AtmosphereAutopilotRedux
-  definitions:
-  - {fileID: 5897886265953266890, guid: 9d348c538b08896459cce323924bb2f1, type: 3}
---- !u!114 &-3887785221650339769
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 83ea0a28af7349aa972a4bcb474b48d7, type: 3}
-  m_Name: AddressablesGroupDatum
-  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.AddressablesGroupDatum
-  StagingPaths:
-  - Deploy/AtmosphereAutopilotRedux/addressables
-  mod: {fileID: 11400000, guid: 655ccab01dfd3e441a3e7c9d0ba516e8, type: 2}
-  targetFolder: Deploy/AtmosphereAutopilotRedux/addressables
---- !u!114 &-136923594491652317
+--- !u!114 &-875827348840464583
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -63,28 +31,13 @@ MonoBehaviour:
   m_Name: Deploy to Zip File Manifest
   m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Manifests.Manifest
   Data:
-  - {fileID: 1373183913726543845}
-  - {fileID: 4653035120355887381}
-  - {fileID: -3887785221650339769}
-  - {fileID: -6510833922781487842}
-  identity: {fileID: -136923594491652317}
+  - {fileID: 4948936163229772604}
+  - {fileID: 177061901057022985}
+  - {fileID: 7890218758056128226}
+  - {fileID: 8121615118885176191}
+  identity: {fileID: -875827348840464583}
   QuickAccess: 0
---- !u!114 &1373183913726543845
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 470dbf1cc5834ffc97c653aa1126938c, type: 3}
-  m_Name: CopyFolderDatum
-  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.CopyFolderDatum
-  StagingPaths: []
-  sourcePath: Assets\AtmosphereAutopilotRedux/Copied
-  destinationPath: Deploy/AtmosphereAutopilotRedux
---- !u!114 &4653035120355887381
+--- !u!114 &177061901057022985
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -100,3 +53,50 @@ MonoBehaviour:
   - Deploy/AtmosphereAutopilotRedux
   possibleFolders:
   - Assets\AtmosphereAutopilotRedux
+--- !u!114 &4948936163229772604
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 470dbf1cc5834ffc97c653aa1126938c, type: 3}
+  m_Name: CopyFolderDatum
+  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.CopyFolderDatum
+  StagingPaths: []
+  sourcePath: Assets\AtmosphereAutopilotRedux/Copied
+  destinationPath: Deploy/AtmosphereAutopilotRedux
+--- !u!114 &7890218758056128226
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83ea0a28af7349aa972a4bcb474b48d7, type: 3}
+  m_Name: AddressablesGroupDatum
+  m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.Modding.Thunderkit.AddressablesGroupDatum
+  StagingPaths:
+  - Deploy/AtmosphereAutopilotRedux/addressables
+  mod: {fileID: 11400000, guid: 655ccab01dfd3e441a3e7c9d0ba516e8, type: 2}
+  targetFolder: Deploy/AtmosphereAutopilotRedux/addressables
+--- !u!114 &8121615118885176191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b7e13dda513544419a89926bd12ad8a, type: 3}
+  m_Name: AssemblyDefinitions
+  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Manifests.Datums.AssemblyDefinitions
+  StagingPaths:
+  - Deploy/AtmosphereAutopilotRedux
+  definitions:
+  - {fileID: 5897886265953266890, guid: 9d348c538b08896459cce323924bb2f1, type: 3}

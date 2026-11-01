@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-8319813794446580794
+--- !u!114 &-8120023123562505579
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -9,11 +9,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3bb24ae4d588a7b4fbc1757e2fb5fd78, type: 3}
-  m_Name: Import Addressable Catalog
-  m_EditorClassIdentifier: 
+  m_Script: {fileID: 11500000, guid: b7f32e9d1a0c584763d21af8c5b9e049, type: 3}
+  m_Name: Ensure Assembly Definitions
+  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Config.Common.EnsureAssemblyDefinitions
   enabled: 1
---- !u!114 &-6454475740555794590
+--- !u!114 &-2430431790186582509
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -27,7 +27,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   enabled: 1
   IncludedSettings: 0
---- !u!114 &-5970621286981679455
+--- !u!114 &-2074866191157495384
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3bb24ae4d588a7b4fbc1757e2fb5fd78, type: 3}
+  m_Name: Import Addressable Catalog
+  m_EditorClassIdentifier: 
+  enabled: 1
+--- !u!114 &-2045056430283842100
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -40,7 +53,7 @@ MonoBehaviour:
   m_Name: Beep
   m_EditorClassIdentifier: 
   enabled: 1
---- !u!114 &-883153019975776657
+--- !u!114 &-954160429308283264
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -49,22 +62,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a4e66fd1b2f0a6b4e951af502eba5a2b, type: 3}
-  m_Name: Create Game Package
+  m_Script: {fileID: 11500000, guid: 208b77589c09e314aa3dbfae9117393a, type: 3}
+  m_Name: Disable Assembly Updater
   m_EditorClassIdentifier: 
-  enabled: 1
---- !u!114 &-384024012507148475
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b7f32e9d1a0c584763d21af8c5b9e049, type: 3}
-  m_Name: Ensure Assembly Definitions
-  m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Config.Common.EnsureAssemblyDefinitions
   enabled: 1
 --- !u!114 &11400000
 MonoBehaviour:
@@ -79,20 +79,20 @@ MonoBehaviour:
   m_Name: ImportConfiguration
   m_EditorClassIdentifier: ThunderKit.Core::ThunderKit.Core.Data.ImportConfiguration
   ConfigurationExecutors:
-  - {fileID: 2411710699144419100}
-  - {fileID: 8489720272712936181}
-  - {fileID: -384024012507148475}
-  - {fileID: 1231290780477754017}
-  - {fileID: 746225461252179668}
-  - {fileID: -6454475740555794590}
-  - {fileID: -883153019975776657}
-  - {fileID: -8319813794446580794}
-  - {fileID: 2723702582540022828}
-  - {fileID: -5970621286981679455}
-  - {fileID: 2399555418115212121}
+  - {fileID: 2580819450658169640}
+  - {fileID: -954160429308283264}
+  - {fileID: -8120023123562505579}
+  - {fileID: 7906451819266902794}
+  - {fileID: 493327295781482115}
+  - {fileID: -2430431790186582509}
+  - {fileID: 2873351119460341598}
+  - {fileID: -2074866191157495384}
+  - {fileID: 8191142308244435279}
+  - {fileID: -2045056430283842100}
+  - {fileID: 1137651694212980036}
   configurationIndex: 11
   totalImportExtensionCount: 11
---- !u!114 &746225461252179668
+--- !u!114 &493327295781482115
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -105,20 +105,7 @@ MonoBehaviour:
   m_Name: Generate SDK Assets
   m_EditorClassIdentifier: ksp2community.ksp2unitytools.editor::Ksp2UnityTools.Editor.SDKAssets.GenerateSDKAssets
   enabled: 1
---- !u!114 &1231290780477754017
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a87a9f1780c348d4080afaf9971d3a7e, type: 3}
-  m_Name: Import Assemblies
-  m_EditorClassIdentifier: 
-  enabled: 1
---- !u!114 &2399555418115212121
+--- !u!114 &1137651694212980036
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -131,7 +118,7 @@ MonoBehaviour:
   m_Name: Prompt Restart
   m_EditorClassIdentifier: 
   enabled: 0
---- !u!114 &2411710699144419100
+--- !u!114 &2580819450658169640
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -144,7 +131,33 @@ MonoBehaviour:
   m_Name: Check Unity Version
   m_EditorClassIdentifier: 
   enabled: 1
---- !u!114 &2723702582540022828
+--- !u!114 &2873351119460341598
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4e66fd1b2f0a6b4e951af502eba5a2b, type: 3}
+  m_Name: Create Game Package
+  m_EditorClassIdentifier: 
+  enabled: 1
+--- !u!114 &7906451819266902794
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a87a9f1780c348d4080afaf9971d3a7e, type: 3}
+  m_Name: Import Assemblies
+  m_EditorClassIdentifier: 
+  enabled: 1
+--- !u!114 &8191142308244435279
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -155,18 +168,5 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8840720793112784295b7c9b06af7493, type: 3}
   m_Name: Get Bitness
-  m_EditorClassIdentifier: 
-  enabled: 1
---- !u!114 &8489720272712936181
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 208b77589c09e314aa3dbfae9117393a, type: 3}
-  m_Name: Disable Assembly Updater
   m_EditorClassIdentifier: 
   enabled: 1

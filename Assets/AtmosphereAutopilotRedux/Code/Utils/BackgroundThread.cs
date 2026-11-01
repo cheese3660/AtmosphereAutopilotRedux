@@ -36,40 +36,30 @@ namespace AtmosphereAutopilotRedux.Utils
     /// </summary>
     public class BackgroundThread : IDisposable
     {
-        List<Func<bool>> execution_que = new List<Func<bool>>();
+        private readonly List<Func<bool>> _executionQue = new List<Func<bool>>();
 
-        Thread thread;
-        ManualResetEvent sema = new ManualResetEvent(true);
+        private readonly Thread _thread;
+        private readonly ManualResetEvent _sema = new ManualResetEvent(true);
 
-        TextWriter logger;
-
-        public BackgroundThread(string log_folder_name)
+        public BackgroundThread()
         {
-            thread = new Thread(new ThreadStart(cycle));
-            logger = File.CreateText(log_folder_name + "/thread.log");
+            _thread = new Thread(new ThreadStart(Cycle)) { IsBackground = true, Name = "AtmosphereAutopilot" };
         }
 
         public void Start()
         {
-            if (stop)
+            if (_stop)
                 throw new InvalidOperationException("Thread was aborted");
-            if (!thread.IsAlive)
+            if (!_thread.IsAlive)
             {
-                thread.Start();
-                logger.WriteLine("Starting");
-                logger.Flush();
+                _thread.Start();
             }
         }
 
         public void Stop()
         {
             Resume();
-            stop = true;
-            lock (logger)
-            {
-                logger.WriteLine("Stopping");
-                logger.Close();
-            }
+            _stop = true;
         }
 
         public void Dispose()
@@ -79,31 +69,31 @@ namespace AtmosphereAutopilotRedux.Utils
 
         public void Pause()
         {
-            if (stop)
+            if (_stop)
                 throw new InvalidOperationException("Thread was stopped");
-            sema.Reset();
+            _sema.Reset();
         }
 
         public void Resume()
         {
-            if (stop)
+            if (_stop)
                 throw new InvalidOperationException("Thread was stopped");
-            sema.Set();
+            _sema.Set();
         }
 
-        public bool IsRunning { get { return thread.IsAlive; } }
+        public bool IsRunning => _thread.IsAlive;
 
-        bool stop = false;
+        private bool _stop = false;
 
-        void cycle()
+        private void Cycle()
         {
             while (true)
             {
-                sema.WaitOne();
-                bool success = false;
-                foreach (var func in execution_que)
+                _sema.WaitOne();
+                var success = false;
+                foreach (var func in _executionQue)
                 {
-                    if (stop)
+                    if (_stop)
                         return;
                     try
                     {
@@ -111,52 +101,45 @@ namespace AtmosphereAutopilotRedux.Utils
                     }
                     catch (Exception e)
                     {
-                        lock (logger)
-                        {
-                            logger.WriteLine("Background thread exception - broken function removed from queue");
-                            logger.WriteLine(e.Message);
-                            logger.WriteLine(e.StackTrace);
-                            logger.WriteLine();
-                            logger.Flush();
-                        }
+                        UnityEngine.Debug.LogError("[AtmosphereAutopilot] Background thread exception - broken function removed from queue\n" + e);
                         remove_func(func);
                     }
-                    sema.WaitOne();
+                    _sema.WaitOne();
                 }
-                if (stop)
+                if (_stop)
                     return;
                 if (!success)
                     Thread.Sleep(5);
-                if (que_flag)
+                if (_queFlag)
                 {
-                    que_flag = false;
-                    lock (removal_que)
+                    _queFlag = false;
+                    lock (_removalQue)
                     {
                         // Process removal requests
-                        while (removal_que.Count > 0)
+                        while (_removalQue.Count > 0)
                         {
-                            var hndl = removal_que[0];
-                            execution_que.Remove(hndl);
-                            removal_que.RemoveAt(0);
+                            var hndl = _removalQue[0];
+                            _executionQue.Remove(hndl);
+                            _removalQue.RemoveAt(0);
                         }
                     }
-                    lock (addition_que)
+                    lock (_additionQue)
                     {
                         // Process addition requests
-                        while (addition_que.Count > 0)
+                        while (_additionQue.Count > 0)
                         {
-                            var hndl = addition_que[0];
-                            execution_que.Add(hndl);
-                            addition_que.RemoveAt(0);
+                            var hndl = _additionQue[0];
+                            _executionQue.Add(hndl);
+                            _additionQue.RemoveAt(0);
                         }
                     }
                 }
             }
         }
 
-        List<Func<bool>> removal_que = new List<Func<bool>>();
-        List<Func<bool>> addition_que = new List<Func<bool>>();
-        volatile bool que_flag = false;
+        private readonly List<Func<bool>> _removalQue = new List<Func<bool>>();
+        private readonly List<Func<bool>> _additionQue = new List<Func<bool>>();
+        private volatile bool _queFlag = false;
 
         /// <summary>
         /// Remove function from thread execution queue.
@@ -164,9 +147,9 @@ namespace AtmosphereAutopilotRedux.Utils
         /// <param name="hndl">Function to remove,</param>
         public void remove_func(Func<bool> hndl)
         {
-            lock (removal_que)
-                removal_que.Add(hndl);
-            que_flag = true;
+            lock (_removalQue)
+                _removalQue.Add(hndl);
+            _queFlag = true;
         }
 
         /// <summary>
@@ -176,9 +159,9 @@ namespace AtmosphereAutopilotRedux.Utils
         /// it didn't execute. You would want to return false if you didn't allow it to run now.</param>
         public void add_func(Func<bool> hndl)
         {
-            lock (addition_que)
-                addition_que.Add(hndl);
-            que_flag = true;
+            lock (_additionQue)
+                _additionQue.Add(hndl);
+            _queFlag = true;
         }
     }
 }

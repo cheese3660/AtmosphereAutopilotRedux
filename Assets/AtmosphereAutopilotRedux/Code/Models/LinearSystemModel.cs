@@ -55,9 +55,9 @@ namespace AtmosphereAutopilotRedux.Models
             Ax = Bu = AxBu = null;
         }
 
-        Matrix Ax;
-        Matrix Bu;
-        Matrix AxBu;
+        private Matrix Ax;
+        private Matrix Bu;
+        private Matrix AxBu;
 
         public void eval(Matrix state, Matrix input, ref Matrix state_deriv)
         {
@@ -69,10 +69,10 @@ namespace AtmosphereAutopilotRedux.Models
 
         public double eval_row(int row, Matrix state, Matrix input)
         {
-            double res = 0.0;
-            for (int i = 0; i < A.cols; i++)
+            var res = 0.0;
+            for (var i = 0; i < A.cols; i++)
                 res += A[row, i] * state[i, 0];
-            for (int i = 0; i < B.cols; i++)
+            for (var i = 0; i < B.cols; i++)
                 res += B[row, i] * input[i, 0];
             res += C[row, 0];
             return res;

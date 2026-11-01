@@ -6,3 +6,36 @@
     flex-grow: 0;
     width: 50%;
 }
+
+.section_header {
+    -unity-font-style: bold;
+    -unity-text-align: upper-center;
+}
+
+.spacer {
+    height: 10px;
+}
+
+.selector_row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.selector_label {
+    width: 70px;
+    flex-shrink: 0;
+}
+
+.segment_button {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+
+.field_row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.root {
+    width: 350px;
+}

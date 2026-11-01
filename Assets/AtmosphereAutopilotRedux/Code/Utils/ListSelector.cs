@@ -30,21 +30,21 @@ namespace AtmosphereAutopilotRedux.Utils
 {
 
     // IList adapter
-    public class ListSelector<ST, RT> : IList<RT>, ICollection<RT>, IEnumerable<RT>, IEnumerable
+    public class ListSelector<St, RT> : IList<RT>, ICollection<RT>, IEnumerable<RT>, IEnumerable
     {
-        IList<ST> source;
-        Func<ST, RT> selector;
+        private readonly IList<St> _source;
+        private readonly Func<St, RT> _selector;
 
-        public ListSelector(IList<ST> source, Func<ST, RT> selector)
+        public ListSelector(IList<St> source, Func<St, RT> selector)
         {
-            this.source = source;
-            this.selector = selector;
+            _source = source;
+            _selector = selector;
         }
 
         public IEnumerator<RT> GetEnumerator()
         {
-            foreach (var x in source)
-                yield return selector(x);
+            foreach (var x in _source)
+                yield return _selector(x);
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -52,15 +52,9 @@ namespace AtmosphereAutopilotRedux.Utils
             return GetEnumerator();
         }
 
-        public int Count
-        {
-            get
-            {
-                return source.Count;
-            }
-        }
+        public int Count => _source.Count;
 
-        public bool IsReadOnly { get { return true; } }
+        public bool IsReadOnly => true;
 
         public void Add(RT item) { throw new NotSupportedException("ListSelector is fixed-size"); }
 
@@ -69,7 +63,7 @@ namespace AtmosphereAutopilotRedux.Utils
         public bool Contains(RT item)
         {
             var comp = EqualityComparer<RT>.Default;
-            for (int i = 0; i < Count; i++)
+            for (var i = 0; i < Count; i++)
                 if (comp.Equals(this[i], item))
                     return true;
             return false;
@@ -85,20 +79,14 @@ namespace AtmosphereAutopilotRedux.Utils
 
         public RT this[int index]
         {
-            get
-            {
-                return selector(source[index]);
-            }
-            set
-            {
-                throw new NotSupportedException("ListSelector is read-only");
-            }
+            get => _selector(_source[index]);
+            set => throw new NotSupportedException("ListSelector is read-only");
         }
 
         public int IndexOf(RT item)
         {
             var comp = EqualityComparer<RT>.Default;
-            for (int i = 0; i < Count; i++)
+            for (var i = 0; i < Count; i++)
                 if (comp.Equals(this[i], item))
                     return i;
             return -1;
@@ -110,7 +98,7 @@ namespace AtmosphereAutopilotRedux.Utils
 
         public override string ToString()
         {
-            string result = "{" + string.Join(", ", this.Select(x => x.ToString()).ToArray()) + "}";
+            var result = "{" + string.Join(", ", this.Select(x => x.ToString()).ToArray()) + "}";
             return result;
         }
 
