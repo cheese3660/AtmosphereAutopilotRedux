@@ -1,0 +1,44 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="project://database/Assets/AtmosphereAutopilotRedux/UI/Mockup/MockupStyles.uss?fileID=7433441132597879392&amp;guid=92b84becf9414c7aa7266af0eaa52f36&amp;type=3#MockupStyles"/>
+    <UitkForKsp2.Controls.AppShell title="Atmosphere Autopilot" show-close-button="true" class="root">
+        <UitkForKsp2.Controls.InvertedCornerBox border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="window-body oab-window-body">
+            <ui:VisualElement class="engage_row">
+                <UitkForKsp2.Controls.OabButton name="FBW" text="Fly By Wire" class="mode_button"/>
+                <UitkForKsp2.Controls.OabButton name="Cruise" text="Cruise Control" class="mode_button"/>
+            </ui:VisualElement>
+            <UitkForKsp2.Controls.InvertedCornerBox name="FMA" border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="fma">
+                <ui:VisualElement class="fma_cell">
+                    <ui:Label text="-" class="fma_active fma_none"/>
+                    <ui:Label text="TOGA" class="fma_armed"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="fma_cell">
+                    <ui:Label text="-" class="fma_active fma_none"/>
+                    <ui:Label text="RWY" class="fma_armed"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="fma_cell fma_cell_last">
+                    <ui:Label text="-" class="fma_active fma_none"/>
+                    <ui:Label text="ROTATE" class="fma_armed"/>
+                </ui:VisualElement>
+            </UitkForKsp2.Controls.InvertedCornerBox>
+            <ui:VisualElement class="tab_row">
+                <ui:Button name="TabCruise" text="CRUISE" class="tab"/>
+                <ui:Button name="TabApproach" text="APPROACH" class="tab"/>
+                <ui:Button name="TabTakeoff" text="TAKEOFF" class="tab tab_active"/>
+            </ui:VisualElement>
+            <UitkForKsp2.Controls.InvertedCornerBox border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="readout">
+                <ui:VisualElement class="readout_cell"><ui:Label text="Runway"/><ui:Label text="KSC 09L" class="readout_value"/></ui:VisualElement>
+                <ui:VisualElement class="readout_cell"><ui:Label text="Course"/><ui:Label text="090°" class="readout_value"/></ui:VisualElement>
+                <ui:VisualElement class="readout_cell"><ui:Label text="Remaining"/><ui:Label text="6.7 km" class="readout_value"/></ui:VisualElement>
+                <ui:VisualElement class="readout_cell"><ui:Label text="Est. roll"/><ui:Label text="1.2 km" class="readout_value"/></ui:VisualElement>
+            </UitkForKsp2.Controls.InvertedCornerBox>
+            <ui:VisualElement class="field_row"><ui:FloatField label="Rotate (m/s)" value="70" name="RotateInput" is-delayed="true" class="field"/></ui:VisualElement>
+            <ui:VisualElement class="field_row"><ui:FloatField label="Pitch (°)" value="10" name="PitchInput" is-delayed="true" class="field"/></ui:VisualElement>
+            <ui:VisualElement class="field_row"><ui:FloatField label="Climb (m/s)" value="90" name="ClimbSpeedInput" is-delayed="true" class="field"/></ui:VisualElement>
+            <ui:VisualElement class="field_row"><ui:IntegerField label="Accel. alt (m)" value="300" name="AccelAltInput" is-delayed="true" class="field"/></ui:VisualElement>
+            <ui:Toggle label="Gear up after liftoff" name="GearUp" value="true" class="switch toggle_field"/>
+            <ui:VisualElement class="action_row">
+                <UitkForKsp2.Controls.OabButton text="ARM TAKEOFF" class="action-button"/>
+            </ui:VisualElement>
+        </UitkForKsp2.Controls.InvertedCornerBox>
+    </UitkForKsp2.Controls.AppShell>
+</ui:UXML>

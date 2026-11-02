@@ -315,6 +315,23 @@ namespace AtmosphereAutopilotRedux.Runtime
             Flag("c_apply_acc", cc.debug_apply_acc);
             Col("c_vert_acc", Vector3d.Dot(cc.DebugDesiredVertAcc, up));
             Col("c_drag_f", cc.DebugFilteredDrag);
+            ApproachGuidance ag = context.Approach;
+            var on_approach = ag.Phase != ApproachPhase.Off && ag.Path != null;
+            Col("a_phase", (int)ag.Phase);
+            Col("a_xtrack", on_approach ? ag.Path.CrossTrack : double.NaN);
+            Col("a_along", on_approach ? ag.Path.AlongTrack : double.NaN);
+            Col("a_gs_err", on_approach ? ag.GlideslopeError : double.NaN);
+            Col("a_vs_cmd", on_approach ? ag.DesiredVerticalSpeed : double.NaN);
+            Col("a_spd", ag.SpeedOverride);
+            Col("a_radio", ag.RadioHeight);
+            Col("a_vs_cmd2", ag.VerticalActive ? ag.DesiredVerticalSpeed : double.NaN);
+            TakeoffGuidance tg = context.Takeoff;
+            var taking_off = tg.Phase != TakeoffPhase.Off && tg.Path != null;
+            Col("k_phase", (int)tg.Phase);
+            Col("k_xtrack", taking_off ? tg.Path.CrossTrack : double.NaN);
+            Col("k_steer_eff", tg.DebugSteerEffectiveness);
+            Col("k_elev_eff", tg.DebugElevatorEffectiveness);
+            Col("o_wheel", output.wheelSteer);
             Col("d_aoa", dc.desired_aoa);
             Col("d_max_lift", dc.max_lift_acc);
             Col("d_strength", dc.strength);
@@ -322,6 +339,13 @@ namespace AtmosphereAutopilotRedux.Runtime
             Col("d_turn_acc", dc.debug_turn_acc);
             Col("d_turn_limit", dc.debug_turn_limit);
             Col("d_roll_err", dc.roll_error);
+            Col("d_max_roll_v", dc.max_roll_v);
+            Col("d_roll_acc", dc.DebugRollAccFactor);
+            var roll_vc = context.VelocityControllers[1] as RollAngularVelocityController;
+            Col("r_max_in", roll_vc != null ? roll_vc.max_input_v : double.NaN);
+            Col("r_min_in", roll_vc != null ? roll_vc.min_input_v : double.NaN);
+            var rg = m.roll_rot_model_gen;
+            Col("r_gen_A00", rg.A[0, 0]); Col("r_gen_A01", rg.A[0, 1]); Col("r_gen_B00", rg.B[0, 0]); Col("r_gen_C00", rg.C[0, 0]);
 
             if (writer == null)
                 Open(vessel);

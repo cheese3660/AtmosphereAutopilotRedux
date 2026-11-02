@@ -42,12 +42,16 @@ namespace AtmosphereAutopilotRedux.Modules
         private FlightModel imodel;
         private DirectorController dir_c;
         private ProgradeThrustController thrust_c;
+        private ApproachGuidance approach;
+        private TakeoffGuidance takeoff;
 
         public override void InitializeDependencies(Dictionary<Type, AutopilotModule> modules)
         {
             imodel = modules[typeof(FlightModel)] as FlightModel;
             dir_c = modules[typeof(DirectorController)] as DirectorController;
             thrust_c = modules[typeof(ProgradeThrustController)] as ProgradeThrustController;
+            approach = modules[typeof(ApproachGuidance)] as ApproachGuidance;
+            takeoff = modules[typeof(TakeoffGuidance)] as TakeoffGuidance;
         }
 
         protected override void OnActivate()
@@ -55,6 +59,8 @@ namespace AtmosphereAutopilotRedux.Modules
             dir_c.Activate();
             thrust_c.Activate();
             imodel.Activate();
+            smoothed_weight = double.NaN;
+            was_toga = false;
 
             // let's set new circle axis
             if (vessel.srfSpeed > 5.0)
@@ -65,6 +71,8 @@ namespace AtmosphereAutopilotRedux.Modules
 
         protected override void OnDeactivate()
         {
+            approach.Deactivate();
+            takeoff.Deactivate();
             dir_c.Deactivate();
             thrust_c.Deactivate();
             imodel.Deactivate();
@@ -77,11 +85,62 @@ namespace AtmosphereAutopilotRedux.Modules
 
         public override void ApplyControl(AACtrlState cntrl)
         {
+            // The takeoff roll and rotation are flown on the ground, where nothing below applies
+            if (takeoff.Active && takeoff.FliesGround)
+            {
+                takeoff.ApplyGround(cntrl);
+                return;
+            }
+            // So is the landing rollout
+            if (approach.Active)
+                approach.CheckTouchdown();
+            if (approach.Active && approach.FliesGround)
+            {
+                approach.ApplyGround(cntrl);
+                return;
+            }
             if (vessel.LandedOrSplashed())
                 return;
 
-            if (thrust_c.spd_control_enabled)
-                thrust_c.ApplyControl(cntrl, thrust_c.setpoint_mps);
+            if (approach.Active)
+            {
+                approach.Update();
+                if (approach.GoAroundComplete)
+                    end_go_around();
+            }
+            if (takeoff.Active)
+            {
+                takeoff.Update();
+                if (takeoff.ClimbComplete)
+                    end_takeoff();
+            }
+            // An approach or the takeoff climb flies its own speed, with or without speed hold on
+            var approach_speed = approach.Active ? approach.SpeedOverride :
+                takeoff.Phase == TakeoffPhase.Climb ? takeoff.ClimbSpeed : double.NaN;
+            // Takeoff and go-around climbs hold TOGA thrust and leave the speed to pitch, as airliners do up to the
+            // acceleration altitude. Through the speed hold, a jet still accelerating past its climb speed at
+            // lift-off had its throttle cut to idle. The speed hold still runs, so the energy balance has its speed
+            // reference, and starts afresh once TOGA ends.
+            var toga = takeoff.Phase == TakeoffPhase.Climb || approach.Phase == ApproachPhase.GoAround;
+            if (!toga && was_toga)
+                thrust_c.ResetSpeedHold();
+            was_toga = toga;
+            speed_managed = thrust_c.spd_control_enabled || !double.IsNaN(approach_speed);
+            if (speed_managed)
+                thrust_c.ApplyControl(cntrl, double.IsNaN(approach_speed) ? thrust_c.setpoint_mps : (float)approach_speed);
+            if (toga)
+                cntrl.mainThrottle = 1.0f;
+            // The flare retards the throttle to idle from wherever it was when the flare began
+            var throttle_limit = approach.Active ? approach.ThrottleLimit : double.NaN;
+            if (double.IsNaN(throttle_limit))
+                retard_from = double.NaN;
+            else
+            {
+                if (double.IsNaN(retard_from))
+                    retard_from = last_throttle;
+                cntrl.mainThrottle = Math.Min(cntrl.mainThrottle, (float)(retard_from * throttle_limit));
+            }
+            last_throttle = cntrl.mainThrottle;
 
             desired_velocity = Vector3d.zero;
             planet2ves = vessel.ReferenceTransform.position - vessel.mainBody.position;
@@ -97,19 +156,6 @@ namespace AtmosphereAutopilotRedux.Modules
                 case CruiseMode.LevelFlight:
                     // simply select velocity from axis
                     desired_velocity = Vector3d.Cross(planet2vesNorm, circle_axis);
-                    handle_wide_turn();
-                    if (vertical_control)
-                    {
-                        switch (height_mode)
-                        {
-                            case HeightMode.Altitude:
-                                desired_velocity = account_for_height(desired_velocity);
-                                break;
-                            case HeightMode.VerticalSpeed:
-                                desired_velocity = account_for_vertical_vel(desired_velocity);
-                                break;
-                        }
-                    }
                     break;
 
                 case CruiseMode.CourseHold:
@@ -123,19 +169,6 @@ namespace AtmosphereAutopilotRedux.Modules
                     var north_projected = Vector3d.ProjectOnPlane(vessel.mainBody.RotationAxis, planet2vesNorm);
                     var rotation = QuaternionD.AngleAxis(desired_course, planet2vesNorm);
                     desired_velocity = rotation * north_projected;
-                    handle_wide_turn();
-                    if (vertical_control)
-                    {
-                        switch (height_mode)
-                        {
-                            case HeightMode.Altitude:
-                                desired_velocity = account_for_height(desired_velocity);
-                                break;
-                            case HeightMode.VerticalSpeed:
-                                desired_velocity = account_for_vertical_vel(desired_velocity);
-                                break;
-                        }
-                    }
                     break;
 
                 case CruiseMode.Waypoint:
@@ -158,18 +191,76 @@ namespace AtmosphereAutopilotRedux.Modules
                     circle_axis = Vector3d.Cross(world_target_pos - vessel.mainBody.position, vessel.GetWorldPos3D() - vessel.mainBody.position).normalized;
                     goto case CruiseMode.LevelFlight;
             }
+            // Once the localizer captures, the approach steers its own track; the takeoff climbs on the runway's
+            if (approach.LateralActive)
+                desired_velocity = approach.DesiredTrack;
+            else if (takeoff.Phase == TakeoffPhase.Climb)
+                desired_velocity = takeoff.DesiredTrack;
+            handle_wide_turn();
+            desired_velocity = apply_vertical(desired_velocity);
 
             // Any stick input would hand pitch and yaw back to the pilot inside the AoA controllers
             ControlUtils.neutralize_user_input(cntrl, PITCH);
             ControlUtils.neutralize_user_input(cntrl, YAW);
 
             var old_str = dir_c.strength;
+            var old_turn_g = dir_c.max_turn_g;
             dir_c.strength *= strength_mult;
+            if (approach.LateralActive || takeoff.Phase == TakeoffPhase.Climb)
+                dir_c.max_turn_g = Math.Min(old_turn_g, approach.TurnLimitG);
             // The director's vertical integral is for steady error; hold it while the altitude profile is moving
             dir_c.hold_vert_integral = desired_vert_acc.magnitude > vert_integral_settled_acc;
             dir_c.ApplyControl(cntrl, desired_velocity, desired_vert_acc);
             dir_c.hold_vert_integral = false;
             dir_c.strength = old_str;
+            dir_c.max_turn_g = old_turn_g;
+        }
+
+        // The glideslope and a go-around fly their own vertical path, and an approach flying its fixes holds the
+        // approach altitude until the glideslope; otherwise the vertical mode set
+        private Vector3d apply_vertical(Vector3d desired_direction)
+        {
+            switch (approach.Phase)
+            {
+                case ApproachPhase.Glideslope:
+                case ApproachPhase.Land:
+                case ApproachPhase.Flare:
+                    return follow_vertical_speed(desired_direction, approach.DesiredVerticalSpeed);
+                case ApproachPhase.GoAround:
+                    return account_for_height(desired_direction, Math.Max(desired_altitude, approach.GoAroundAltitude),
+                        approach.go_around_speed_weight);
+            }
+            if (takeoff.Phase == TakeoffPhase.Climb)
+                return account_for_height(desired_direction, Math.Max(desired_altitude, takeoff.ClimbAltitude),
+                    takeoff.climb_speed_weight);
+            var approach_altitude = approach.AltitudeOverride;
+            if (!double.IsNaN(approach_altitude))
+                return account_for_height(desired_direction, approach_altitude, speed_weight);
+            if (!vertical_control)
+                return desired_direction;
+            return height_mode == HeightMode.Altitude
+                ? account_for_height(desired_direction, desired_altitude, speed_weight)
+                : account_for_vertical_vel(desired_direction);
+        }
+
+        // A takeoff that has climbed out hands back to cruise the same way
+        private void end_takeoff()
+        {
+            desired_course = takeoff.Path.CourseDeg;
+            CourseHoldMode = true;
+            height_mode = HeightMode.Altitude;
+            vertical_control = true;
+            takeoff.Deactivate();
+        }
+
+        // A go-around that has climbed out hands back to cruise on the runway course, holding the cruise altitude
+        private void end_go_around()
+        {
+            desired_course = approach.Path.CourseDeg;
+            CourseHoldMode = true;
+            height_mode = HeightMode.Altitude;
+            vertical_control = true;
+            approach.Deactivate();
         }
 
         private void handle_wide_turn()
@@ -306,6 +397,15 @@ namespace AtmosphereAutopilotRedux.Modules
 
         public double dist_to_dest = 0.0;
 
+        // Whether the throttle holds a speed this step: speed hold's, or the approach's own
+        private bool speed_managed;
+
+        // Whether last step held TOGA thrust
+        private bool was_toga;
+
+        // Throttle the last step left, and the one the flare's retard started from
+        private double last_throttle, retard_from = double.NaN;
+
         private double filtered_drag = 0.0;
         private double filtered_lift = 0.0;
         private double allowed_angle = 0.0;             // rate-limited climb or dive angle limit, degrees
@@ -327,16 +427,13 @@ namespace AtmosphereAutopilotRedux.Modules
             return res.normalized;
         }
 
-        private Vector3d account_for_height(Vector3d desired_direction)
-        {
-            var dt = Time.fixedDeltaTime;
-            var cur_alt = vessel.altitude;
-            var height_error = desired_altitude - cur_alt;
-            var acc = Vector3d.Dot(imodel.gravity_acc + imodel.noninert_acc, -planet2vesNorm);    // free-fall vertical acceleration
-            var cur_vert_speed = Vector3d.Dot(imodel.surface_v, planet2vesNorm);
+        private double free_fall_acc() =>
+            Vector3d.Dot(imodel.gravity_acc + imodel.noninert_acc, -planet2vesNorm);
 
-            // (Re)entering altitude hold: start the smoothed state from how the vessel is flying now
-            if (!(Time.fixedTimeAsDouble - last_height_hold_time <= 2.0 * dt))
+        // (Re)entering a shaped vertical path: start the smoothed state from how the vessel is flying now
+        private void begin_vertical_step(double cur_vert_speed)
+        {
+            if (!(Time.fixedTimeAsDouble - last_height_hold_time <= 2.0 * Time.fixedDeltaTime))
             {
                 commanded_vert_speed = cur_vert_speed;
                 commanded_vert_acc = 0.0;
@@ -345,6 +442,26 @@ namespace AtmosphereAutopilotRedux.Modules
                 filtered_drag = thrust_c.drag_estimate;
             }
             last_height_hold_time = Time.fixedTimeAsDouble;
+        }
+
+        // A vertical speed planned elsewhere, such as the glideslope's, eased into the same way altitude hold's is
+        private Vector3d follow_vertical_speed(Vector3d desired_direction, double des_vert_speed)
+        {
+            var acc = free_fall_acc();
+            begin_vertical_step(Vector3d.Dot(imodel.surface_v, planet2vesNorm));
+            debug_raw_vert_speed = des_vert_speed;
+            return shape_vertical_speed(desired_direction, des_vert_speed, max_vert_acc_g * acc, acc);
+        }
+
+        private Vector3d account_for_height(Vector3d desired_direction, double target_altitude, double weight)
+        {
+            var dt = Time.fixedDeltaTime;
+            var cur_alt = vessel.altitude;
+            var height_error = target_altitude - cur_alt;
+            var acc = free_fall_acc();    // free-fall vertical acceleration
+            var cur_vert_speed = Vector3d.Dot(imodel.surface_v, planet2vesNorm);
+
+            begin_vertical_step(cur_vert_speed);
             filtered_drag = Common.simple_filter(thrust_c.drag_estimate, filtered_drag, 5.0);
             filtered_lift = Common.simple_filter(dir_c.max_lift_acc, filtered_lift, lift_filter_k);
 
@@ -379,9 +496,21 @@ namespace AtmosphereAutopilotRedux.Modules
             var apply_acc = Math.Abs(des_vert_speed) < max_vert_speed;
             debug_raw_vert_speed = des_vert_speed;
             des_vert_speed = Common.Clamp(des_vert_speed, max_vert_speed);
-            if (thrust_c.spd_control_enabled)
-                des_vert_speed = Common.Clamp(energy_balance(des_vert_speed, cur_vert_speed, acc),
+            if (speed_managed)
+                des_vert_speed = Common.Clamp(energy_balance(des_vert_speed, cur_vert_speed, acc, weight),
                     max_vert_speed);
+            debug_height_error = height_error;
+            debug_max_climb_angle = effective_max_climb_angle;
+            debug_max_vert_speed = max_vert_speed;
+            debug_relax_k = in_linear_tail ? 1.0 : 0.0;
+            debug_apply_acc = apply_acc;
+            return shape_vertical_speed(desired_direction, des_vert_speed, max_vert_acc, acc);
+        }
+
+        private Vector3d shape_vertical_speed(Vector3d desired_direction, double des_vert_speed, double max_vert_acc,
+            double acc)
+        {
+            var dt = Time.fixedDeltaTime;
 
             // Ease into the new vertical speed instead of stepping to it; its rate of change is the feed-forward,
             // so the director is told the same acceleration the command implies. The acceleration itself changes
@@ -404,12 +533,7 @@ namespace AtmosphereAutopilotRedux.Modules
             commanded_vert_speed += commanded_vert_acc * dt;
             var res = desired_direction.normalized * vessel.horizontalSrfSpeed + planet2vesNorm * commanded_vert_speed;
             desired_vert_acc = planet2vesNorm * commanded_vert_acc;
-            debug_height_error = height_error;
-            debug_max_climb_angle = effective_max_climb_angle;
-            debug_max_vert_speed = max_vert_speed;
-            debug_relax_k = in_linear_tail ? 1.0 : 0.0;
             debug_cmd_vert_speed = commanded_vert_speed;
-            debug_apply_acc = apply_acc;
             // The throttle pays for the flight path being commanded
             thrust_c.commanded_vertical_speed = commanded_vert_speed;
             return res.normalized;
@@ -443,16 +567,24 @@ namespace AtmosphereAutopilotRedux.Modules
 
         private double speed_priority;
 
+        /// <summary>
+        /// Time constant, s, a change of mode's speed weight eases in over. Stepping from a climb's speed priority to
+        /// altitude hold at the hand-off kicked the nose up.
+        /// </summary>
+        public double speed_weight_change_time = 2.0;
+
+        private double smoothed_weight = double.NaN;
+
         internal double debug_speed_weight, debug_balance_vs;
 
-        private double energy_balance(double profile_vs, double cur_vs, double g)
+        private double energy_balance(double profile_vs, double cur_vs, double g, double base_weight)
         {
             var dt = Time.fixedDeltaTime;
             var speed = imodel.surface_v_magnitude;
             var reference = thrust_c.SpeedReference;
             if (double.IsNaN(reference) || speed < 1.0 || g <= 0.0)
             {
-                debug_speed_weight = speed_weight;
+                debug_speed_weight = base_weight;
                 debug_balance_vs = 0.0;
                 return profile_vs;
             }
@@ -461,7 +593,11 @@ namespace AtmosphereAutopilotRedux.Modules
                 (thrust_c.ThrottleAtIdle && target_error < 0.0 && profile_vs < 0.0);
             speed_priority += ((saturated ? 1.0 : 0.0) - speed_priority) *
                 (1.0 - Math.Exp(-dt / Math.Max(dt, speed_priority_time)));
-            var weight = Common.Clamp(speed_weight, 0.0, 2.0);
+            if (double.IsNaN(smoothed_weight))
+                smoothed_weight = base_weight;
+            smoothed_weight += (base_weight - smoothed_weight) *
+                (1.0 - Math.Exp(-dt / Math.Max(dt, speed_weight_change_time)));
+            var weight = Common.Clamp(smoothed_weight, 0.0, 2.0);
             weight += speed_priority * (2.0 - weight);
             var height_share = Math.Min(1.0, 2.0 - weight);
             var speed_share = Math.Min(1.0, weight);

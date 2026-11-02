@@ -59,6 +59,15 @@ namespace AtmosphereAutopilotRedux.Modules
         protected override void OnActivate()
         {
             imodel.Activate();
+            ResetSpeedHold();
+        }
+
+        /// <summary>
+        /// Starts the speed hold afresh from how the vessel flies now, as on engaging: after something else held the
+        /// throttle, such as TOGA thrust, its integral and speed reference no longer mean anything.
+        /// </summary>
+        internal void ResetSpeedHold()
+        {
             v_integral = 0.0;
             filtered_acc = double.NaN;
             speed_reference = double.NaN;

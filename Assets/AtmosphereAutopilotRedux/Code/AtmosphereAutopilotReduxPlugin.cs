@@ -16,6 +16,9 @@ namespace AtmosphereAutopilotRedux
     {
         internal const string AppButtonId = "BTN-AtmosphereAutopilot";
 
+        // As in swinfo.json, which Space Warp knows the mod by
+        private const string ModId = "AtmosphereAutopilotRedux";
+
         private VisualTreeAsset _windowUxml;
         private Sprite _icon;
         private WindowController _controller;
@@ -25,6 +28,12 @@ namespace AtmosphereAutopilotRedux
             "Write a CSV of every physics step to AppData/LocalLow/.../AtmosphereAutopilotRedux for tuning the autopilot.")]
         [ConfigMetadata(ConfigTags.Hidden)]
         public bool FlightRecorderEnabled = false;
+
+        public override void OnPreInitialized()
+        {
+            // Loading actions have to be in before boot builds its flow
+            Runtime.RunwayDatabase.Register(ModId);
+        }
 
         public override void OnInitialized()
         {

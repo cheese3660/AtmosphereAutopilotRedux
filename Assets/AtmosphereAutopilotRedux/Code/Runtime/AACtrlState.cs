@@ -28,6 +28,7 @@ namespace AtmosphereAutopilotRedux.Runtime
         public float pitch, roll, yaw;
         public float pitchTrim, rollTrim, yawTrim;
         public float mainThrottle;
+        public float wheelSteer;
         public bool precision;
 
         public void CopyFrom(in FlightCtrlState s)
@@ -39,6 +40,7 @@ namespace AtmosphereAutopilotRedux.Runtime
             rollTrim = s.rollTrim;
             yawTrim = s.yawTrim;
             mainThrottle = s.mainThrottle;
+            wheelSteer = s.wheelSteer;
             precision = s.precision;
         }
 
@@ -51,6 +53,7 @@ namespace AtmosphereAutopilotRedux.Runtime
             s.rollTrim = rollTrim;
             s.yawTrim = yawTrim;
             s.mainThrottle = mainThrottle;
+            s.wheelSteer = wheelSteer;
         }
     }
 }

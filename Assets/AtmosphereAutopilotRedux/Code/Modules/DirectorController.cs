@@ -170,7 +170,7 @@ namespace AtmosphereAutopilotRedux.Modules
         public double turn_jerk_g = 0.5;
 
         /// <summary>
-        /// Speed deficit, m/s, under the speed hold setpoint over which the turn limit shrinks to its floor.
+        /// Speed deficit, m/s, under the speed being held over which the turn limit shrinks to its floor.
         /// </summary>
         public double turn_speed_margin = 20.0;
 
@@ -262,12 +262,14 @@ namespace AtmosphereAutopilotRedux.Modules
             turn_error_filter_reset = false;
             turn_error = filtered_turn_error;
 
-            // The turn limit shrinks while the turn bleeds speed below the speed hold setpoint, so the craft turns as
-            // hard as its engines can sustain
+            // The turn limit shrinks while the turn bleeds speed below the speed being held, so the craft turns as
+            // hard as its engines can sustain. That is the thrust controller's target this step, not the speed hold
+            // setpoint: an approach holds its own speed, and against a cruise setpoint far above it the limit sat at
+            // its floor, a 2 degree bank.
             var limit_frac_target = 1.0;
             if (thrust_c.spd_control_enabled)
             {
-                var spd_diff = speed - thrust_c.setpoint_mps;
+                var spd_diff = speed - thrust_c.desired_v;
                 if (spd_diff < 0.0)
                     limit_frac_target = Math.Max(turn_limit_floor, 1.0 + spd_diff / turn_speed_margin);
             }
@@ -515,6 +517,9 @@ namespace AtmosphereAutopilotRedux.Modules
         // [AutoGuiAttr("max_roll_v", false, "G5")]
         public double max_roll_v;
 
+        // Diagnostics for FlightRecorder
+        internal double DebugRollAccFactor => roll_acc_factor;
+
         // [AutoGuiAttr("roll_error", false, "G5")]
         public double roll_error = 0.0;
 
@@ -536,13 +541,21 @@ namespace AtmosphereAutopilotRedux.Modules
             roll_state_m[2, 0] = 1.0;
             roll_input_m[0, 0] = 1.0;
             var roll_max_acc = imodel.roll_rot_model_gen.eval_row(0, roll_state_m, roll_input_m) * (precision_mode ? 0.4 : 1.0) * strength;
-            roll_acc_factor = Common.simple_filter(Math.Abs(roll_max_acc), roll_acc_factor, roll_acc_filter);
+            // A filter keeps a NaN forever: one bad model step left every large roll request NaN, which the rate
+            // controller's moderation reads as zero, and the bank stuck wherever it was
+            if (!double.IsNaN(roll_max_acc) && !double.IsInfinity(roll_max_acc))
+                roll_acc_factor = Common.simple_filter(Math.Abs(roll_max_acc), roll_acc_factor, roll_acc_filter);
+            if (double.IsNaN(roll_acc_factor) || double.IsInfinity(roll_acc_factor))
+                roll_acc_factor = 0.0;
 
             // calculate anti-overshooting perameters
             if (angle_error >= 0.0)
                 max_roll_v = Math.Min(roll_c.max_input_v, roll_c.max_v_construction);
             else
                 max_roll_v = Math.Abs(Math.Max(roll_c.min_input_v, -roll_c.max_v_construction));
+            // Never below the rate controller's own floor, so a collapsed limit still lets the bank move
+            if (double.IsNaN(max_roll_v) || max_roll_v < RollAngularVelocityController.min_abs_angv)
+                max_roll_v = RollAngularVelocityController.min_abs_angv;
             max_roll_v *= strength;
             var stop_time = Math.Max(max_roll_v / Math.Max(1e-3, roll_acc_factor) + 1.0f / imodel.csurf_response_rate, 0.1);
 

@@ -21,6 +21,7 @@ using KSP.Game;
 using KSP.Sim.impl;
 using KSP.Sim.State;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 using AtmosphereAutopilotRedux.Models;
 using AtmosphereAutopilotRedux.Modules;
@@ -41,6 +42,16 @@ namespace AtmosphereAutopilotRedux.Runtime
         public StandardFlyByWire FlyByWire { get; }
         public CruiseController Cruise { get; }
         public ProgradeThrustController Speed { get; }
+
+        /// <summary>
+        /// Runway approach, flown on top of cruise.
+        /// </summary>
+        public ApproachGuidance Approach { get; }
+
+        /// <summary>
+        /// Runway takeoff, flown on top of cruise.
+        /// </summary>
+        public TakeoffGuidance Takeoff { get; }
 
         /// <summary>
         /// The engaged high-level autopilot, or null when disengaged.
@@ -73,6 +84,8 @@ namespace AtmosphereAutopilotRedux.Runtime
             Add(new DirectorController(Vessel));
             Add(Speed = new ProgradeThrustController(Vessel));
             Add(FlyByWire = new StandardFlyByWire(Vessel));
+            Add(Approach = new ApproachGuidance(Vessel));
+            Add(Takeoff = new TakeoffGuidance(Vessel));
             Add(Cruise = new CruiseController(Vessel));
 
             foreach (var module in modules.Values)
@@ -84,6 +97,12 @@ namespace AtmosphereAutopilotRedux.Runtime
                 (AngularVelAdaptiveController)modules[typeof(RollAngularVelocityController)],
                 (AngularVelAdaptiveController)modules[typeof(YawAngularVelocityController)],
             };
+
+            // The abort key goes around and rejects takeoffs. Its action group only changes state on vessels with
+            // something bound to it, so the key itself is listened to.
+            abort_action = GameManager.Instance?.Game?.Input?.Flight.TriggerActionGroupAbort;
+            if (abort_action != null)
+                abort_action.performed += OnAbortPressed;
 
             // The recorder logs disengaged flight too, so while it is on the hook stays for the context's lifetime
             recorder = new FlightRecorder(this);
@@ -99,6 +118,17 @@ namespace AtmosphereAutopilotRedux.Runtime
         private readonly FlightRecorder recorder;
 
         private void Add(AutopilotModule module) => modules[module.GetType()] = module;
+
+        private readonly InputAction abort_action;
+
+        // Set from the input callback, acted on in the next physics step
+        private bool abort_pressed;
+
+        private void OnAbortPressed(InputAction.CallbackContext _)
+        {
+            if (GameManager.Instance.Game.ViewController.IsActiveVessel(Vessel.Sim))
+                abort_pressed = true;
+        }
 
         /// <summary>
         /// Engage a high-level autopilot, switching from the current one if needed.
@@ -194,6 +224,16 @@ namespace AtmosphereAutopilotRedux.Runtime
             // only run on the background thread when it is activated, so this does not train the model.
             if (FlightModel.Active || recording)
                 FlightModel.OnPreAutopilot(ctrl);
+            Approach.RolloutSteeringSeed = Takeoff.LearnedSteeringGain;
+            if (abort_pressed)
+            {
+                abort_pressed = false;
+                if (engaged)
+                {
+                    Approach.Abort();
+                    Takeoff.Abort();
+                }
+            }
             if (engaged)
             {
                 ActiveController.ApplyControl(ctrl);
@@ -206,6 +246,19 @@ namespace AtmosphereAutopilotRedux.Runtime
 
             if (recording)
                 recorder.Record(raw_in, prev_applied, ctrl, engaged);
+
+            // At minimums the approach hands the landing to the pilot, after this step's control went out
+            if (Approach.HandOverRequested)
+            {
+                Approach.HandOverRequested = false;
+                Engage(FlyByWire);
+            }
+            // A rejected takeoff or a landing rollout that has stopped hands everything back
+            if (Takeoff.StopRequested || Approach.StopRequested)
+            {
+                Takeoff.StopRequested = Approach.StopRequested = false;
+                Disengage();
+            }
         }
 
         /// <summary>
@@ -235,6 +288,8 @@ namespace AtmosphereAutopilotRedux.Runtime
 
         public void Dispose()
         {
+            if (abort_action != null)
+                abort_action.performed -= OnAbortPressed;
             Disengage();
             Unhook();
             recorder.Dispose();

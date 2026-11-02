@@ -1,0 +1,238 @@
+.root {
+    width: 350px;
+}
+
+.window-body {
+    padding: 8px;
+}
+
+/* Rows keep their natural height; the window grows instead */
+.window-body > * {
+    flex-shrink: 0;
+}
+
+.mode_button {
+    flex-grow: 1;
+    flex-basis: 0;
+    height: 30px;
+}
+
+.engage_row {
+    flex-direction: row;
+    margin-bottom: 8px;
+}
+
+/* Flight mode annunciator: active modes on top, armed modes below */
+.fma {
+    flex-direction: row;
+    margin-bottom: 10px;
+    padding: 6px 0;
+}
+
+.fma_cell {
+    flex-grow: 1;
+    flex-basis: 0;
+    align-items: center;
+    border-right-width: 1px;
+    border-right-color: rgb(70, 82, 91);
+}
+
+.fma_cell_last {
+    border-right-width: 0;
+}
+
+.fma_active {
+    color: rgb(63, 207, 116);
+    font-size: 15px;
+    -unity-text-align: middle-center;
+    padding: 0;
+}
+
+.fma_armed {
+    color: rgb(226, 230, 238);
+    font-size: 11px;
+    -unity-text-align: middle-center;
+    padding: 0;
+}
+
+.fma_none {
+    color: rgb(128, 137, 151);
+}
+
+.tab_row {
+    flex-direction: row;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(70, 82, 91);
+    margin-bottom: 8px;
+}
+
+.tab {
+    flex-grow: 1;
+    flex-basis: 0;
+    height: 26px;
+    margin: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 0;
+    color: rgb(138, 144, 156);
+    font-size: 13px;
+}
+
+.tab:hover {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: rgb(226, 230, 238);
+}
+
+.tab_active {
+    border-bottom-width: 2px;
+    border-bottom-color: rgb(185, 163, 255);
+    color: rgb(226, 230, 238);
+}
+
+.section-title {
+    color: rgb(115, 121, 221);
+    font-size: 11px;
+    margin-top: 4px;
+    margin-bottom: 5px;
+    -unity-font-definition: url("project://database/Packages/ksp2redux.sdk/Controls/Assets/Theme/Fonts/RosesAreFF0000/RosesareFF0000%20SDF.asset?fileID=11400000&guid=f2516f1635a41814ca97b23fac4691fd&type=2#RosesareFF0000 SDF");
+    letter-spacing: 20px;
+}
+
+.selector_row {
+    flex-direction: row;
+    align-items: center;
+}
+
+/* Every row shares one label column */
+.selector_label,
+.field > .unity-base-field__label {
+    width: 120px;
+    min-width: 120px;
+    max-width: 120px;
+    flex-shrink: 0;
+    margin-left: 0;
+    padding-left: 0;
+}
+
+.field,
+.toggle_field {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.toggle_field > .unity-base-field__label {
+    flex-grow: 1;
+    margin-left: 0;
+    padding-left: 0;
+}
+
+.segment_button {
+    flex-grow: 1;
+    flex-basis: 0;
+    height: 28px;
+}
+
+.field_row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.field {
+    flex-grow: 1;
+    -unity-text-align: middle-left;
+}
+
+.readout {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    margin: 8px 0;
+}
+
+.readout_cell {
+    width: 50%;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 2px 8px 2px 0;
+}
+
+.readout_cell_full {
+    width: 100%;
+    padding-right: 0;
+}
+
+.readout_value {
+    color: rgb(211, 175, 122);
+}
+
+/* Course deviation scales */
+.deviation {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+}
+
+.deviation_row {
+    flex-direction: row;
+    align-items: center;
+    height: 20px;
+}
+
+.deviation_label {
+    width: 36px;
+    flex-shrink: 0;
+}
+
+.deviation_scale {
+    flex-grow: 1;
+    height: 16px;
+}
+
+.deviation_line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 7px;
+    height: 1px;
+    background-color: rgb(107, 112, 128);
+}
+
+.deviation_centre {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 1px;
+    height: 16px;
+    background-color: rgb(226, 230, 238);
+}
+
+.deviation_marker {
+    position: absolute;
+    top: 3px;
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    background-color: rgb(185, 163, 255);
+    rotate: 45deg;
+}
+
+.deviation_value {
+    width: 60px;
+    -unity-text-align: middle-right;
+    color: rgb(211, 175, 122);
+}
+
+.action_row {
+    flex-direction: row;
+    margin-top: 12px;
+}
+
+.action-button {
+    flex-grow: 1;
+    flex-basis: 0;
+    height: 30px;
+}
+
+.action-button-wide {
+    flex-grow: 2;
+}

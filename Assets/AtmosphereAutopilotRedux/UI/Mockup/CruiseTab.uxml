@@ -1,0 +1,45 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="project://database/Assets/AtmosphereAutopilotRedux/UI/Mockup/MockupStyles.uss?fileID=7433441132597879392&amp;guid=92b84becf9414c7aa7266af0eaa52f36&amp;type=3#MockupStyles"/>
+    <UitkForKsp2.Controls.AppShell title="Atmosphere Autopilot" show-close-button="true" class="root">
+        <UitkForKsp2.Controls.InvertedCornerBox border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="window-body oab-window-body">
+            <ui:VisualElement class="engage_row">
+                <UitkForKsp2.Controls.OabButton name="FBW" text="Fly By Wire" class="mode_button"/>
+                <UitkForKsp2.Controls.OabButton name="Cruise" text="Cruise Control" class="mode_button active"/>
+            </ui:VisualElement>
+            <UitkForKsp2.Controls.InvertedCornerBox name="FMA" border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="fma">
+                <ui:VisualElement class="fma_cell">
+                    <ui:Label text="SPEED" class="fma_active"/>
+                    <ui:Label text="-" class="fma_armed fma_none"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="fma_cell">
+                    <ui:Label text="HDG" class="fma_active"/>
+                    <ui:Label text="-" class="fma_armed fma_none"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="fma_cell fma_cell_last">
+                    <ui:Label text="ALT" class="fma_active"/>
+                    <ui:Label text="-" class="fma_armed fma_none"/>
+                </ui:VisualElement>
+            </UitkForKsp2.Controls.InvertedCornerBox>
+            <ui:VisualElement class="tab_row">
+                <ui:Button name="TabCruise" text="CRUISE" class="tab tab_active"/>
+                <ui:Button name="TabApproach" text="APPROACH" class="tab"/>
+                <ui:Button name="TabTakeoff" text="TAKEOFF" class="tab"/>
+            </ui:VisualElement>
+            <ui:Label text="SPEED" class="section-title"/>
+            <ui:VisualElement class="field_row"><ui:FloatField label="Speed (m/s)" value="1016" name="SpeedInput" is-delayed="true" class="field"/><ui:Toggle name="SpeedEnabled" value="true" class="switch"/></ui:VisualElement>
+            <ui:Label text="COURSE" class="section-title"/>
+            <ui:VisualElement class="selector_row">
+                <UitkForKsp2.Controls.OabButton name="SegHold" text="Hold" class="segment_button active"/>
+                <UitkForKsp2.Controls.OabButton name="SegHeading" text="Heading" class="segment_button"/>
+                <UitkForKsp2.Controls.OabButton name="SegWaypoint" text="Waypoint" class="segment_button" enabled="false"/>
+            </ui:VisualElement>
+            <ui:Label text="VERTICAL" class="section-title"/>
+            <ui:VisualElement class="selector_row">
+                <UitkForKsp2.Controls.OabButton name="SegOff" text="Off" class="segment_button"/>
+                <UitkForKsp2.Controls.OabButton name="SegAltitude" text="Altitude" class="segment_button active"/>
+                <UitkForKsp2.Controls.OabButton name="SegVS" text="V/S" class="segment_button"/>
+            </ui:VisualElement>
+            <ui:VisualElement class="field_row"><ui:IntegerField label="Altitude (m)" value="500" name="AltitudeInput" is-delayed="true" class="field"/></ui:VisualElement>
+        </UitkForKsp2.Controls.InvertedCornerBox>
+    </UitkForKsp2.Controls.AppShell>
+</ui:UXML>

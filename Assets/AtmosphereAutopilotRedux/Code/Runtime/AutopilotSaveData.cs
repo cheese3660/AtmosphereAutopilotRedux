@@ -40,6 +40,32 @@ namespace AtmosphereAutopilotRedux.Runtime
         public bool SpeedHold;
         public float Speed;
 
+        // The approach set up: airport id, runway name and end designator, as the airport data names them
+        public string ApproachAirport = "";
+        public string ApproachRunway = "";
+        public string ApproachEnd = "";
+        public float Glideslope = 3.0f;
+        public float ApproachSpeed = 85.0f;
+        public int Minimums = 60;
+        public bool FlyFixes = true;
+        public bool Autoland;
+        public int ApproachHeight = 600;
+        public bool ApproachArmed;
+
+        // How far the approach had got, so a load near the runway resumes on final instead of flying the fixes again
+        public string ApproachPhase = "Off";
+
+        // The takeoff set up
+        public float RotateSpeed = 70.0f;
+        public float RotatePitch = 10.0f;
+        public float ClimbSpeed = 90.0f;
+        public int AccelHeight = 300;
+        public bool GearUp = true;
+
+        // Measured on the runway, so a landing knows its height over the gear without estimating; 0 is unknown
+        public double GearOffset;
+        public double SteeringGain;
+
         // What the flight model learned, so a load or a switch back doesn't start it from the seed. Only valid for the
         // vessel as it was: mass and part count say whether it still is.
         public double Mass;

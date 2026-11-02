@@ -27,6 +27,18 @@ MonoBehaviour:
     m_SerializedLabels:
     - aa-ui
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f6f48072a3cd45b8b7892babfec4bdbd
+    m_Address: Assets/AtmosphereAutopilotRedux/Airports/KSC.json
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - aa_airports
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: abd2eb7173a44d0c9b4f18ffe256f092
+    m_Address: Assets/AtmosphereAutopilotRedux/Airports/KSC_Island.json
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - aa_airports
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: b2dbbe24f697c13418655e19b4529363, type: 2}
   m_SchemaSet:

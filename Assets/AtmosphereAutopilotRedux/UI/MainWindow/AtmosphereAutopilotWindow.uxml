@@ -1,45 +1,164 @@
 <ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <Style src="project://database/Assets/AtmosphereAutopilotRedux/UI/MainWindow/MainWindowStyles.uss?fileID=7433441132597879392&amp;guid=690b90a557da29041bc80f138c7fb63a&amp;type=3#MainWindowStyles"/>
-    <UitkForKsp2.Controls.AppShell title="Atmosphere Autopilot" show-close-button="true">
+    <UitkForKsp2.Controls.AppShell title="Atmosphere Autopilot" show-close-button="true" class="root">
         <ui:Label text="No Control" enabled="true" enable-rich-text="true" name="NoControl" style="display: none; -unity-text-align: upper-center; color: rgb(255, 0, 41); -unity-font-style: bold; font-size: 20px;"/>
-        <ui:VisualElement name="Selectors" style="flex-grow: 1; flex-direction: row;">
-            <UitkForKsp2.Controls.OabButton name="FBW" text="Fly By Wire" class="mode_button"/>
-            <UitkForKsp2.Controls.OabButton name="Cruise" text="Cruise Control" class="mode_button"/>
-        </ui:VisualElement>
-        <ui:VisualElement name="SpeedControls" style="flex-grow: 1; display: none;">
-            <ui:Label text="Speed Controls" class="section_header"/>
-            <ui:VisualElement style="flex-grow: 1; flex-direction: row; align-self: auto; justify-content: space-evenly; align-items: center;">
-                <ui:FloatField label="Speed (m/s)" value="100" name="SpeedInput" is-delayed="true" style="flex-grow: 1; -unity-text-align: middle-left;"/>
-                <ui:Toggle label="" name="SpeedEnabled" class="switch"/>
+        <UitkForKsp2.Controls.InvertedCornerBox border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="window-body oab-window-body">
+            <ui:VisualElement name="Selectors" class="engage_row">
+                <UitkForKsp2.Controls.OabButton name="FBW" text="Fly By Wire" class="mode_button"/>
+                <UitkForKsp2.Controls.OabButton name="Cruise" text="Cruise Control" class="mode_button"/>
             </ui:VisualElement>
-        </ui:VisualElement>
-        <ui:VisualElement name="CruiseControls" style="flex-grow: 1; display: none;">
-            <ui:Label text="Cruise Controls" class="section_header"/>
-            <ui:VisualElement class="selector_row">
-                <ui:Label text="Course" class="selector_label"/>
-                <UitkForKsp2.Controls.OabButton name="CourseHold" text="Hold" class="segment_button"/>
-                <UitkForKsp2.Controls.OabButton name="CourseHeading" text="Heading" class="segment_button"/>
-                <UitkForKsp2.Controls.OabButton name="CourseWaypoint" text="Waypoint" class="segment_button"/>
+            <UitkForKsp2.Controls.InvertedCornerBox name="FMA" border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="fma">
+                <ui:VisualElement class="fma_cell">
+                    <ui:Label name="FmaSpeed" text="-" class="fma_active"/>
+                    <ui:Label name="FmaSpeedArmed" text="-" class="fma_armed"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="fma_cell">
+                    <ui:Label name="FmaLateral" text="-" class="fma_active"/>
+                    <ui:Label name="FmaLateralArmed" text="-" class="fma_armed"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="fma_cell fma_cell_last">
+                    <ui:Label name="FmaVertical" text="-" class="fma_active"/>
+                    <ui:Label name="FmaVerticalArmed" text="-" class="fma_armed"/>
+                </ui:VisualElement>
+            </UitkForKsp2.Controls.InvertedCornerBox>
+            <ui:VisualElement class="tab_row">
+                <ui:Button name="TabCruise" text="CRUISE" class="tab tab_active"/>
+                <ui:Button name="TabApproach" text="APPROACH" class="tab"/>
+                <ui:Button name="TabTakeoff" text="TAKEOFF" class="tab"/>
             </ui:VisualElement>
-            <ui:VisualElement name="HeadingRow" class="field_row" style="display: none;">
-                <ui:IntegerField label="Heading (°)" value="90" name="HeadingInput" is-delayed="true" style="-unity-text-align: middle-left; flex-grow: 1;"/>
+            <ui:VisualElement name="CruiseTab">
+                <ui:Label name="EngageHint" text="Engage Fly By Wire or Cruise Control" class="hint"/>
+                <ui:VisualElement name="SpeedControls" style="display: none;">
+                    <ui:Label text="SPEED" class="section-title"/>
+                    <ui:VisualElement class="field_row">
+                        <ui:FloatField label="Speed (m/s)" value="100" name="SpeedInput" is-delayed="true" class="field"/>
+                        <ui:Toggle label="" name="SpeedEnabled" class="switch"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="CruiseControls" style="display: none;">
+                    <ui:Label text="COURSE" class="section-title"/>
+                    <ui:VisualElement class="selector_row">
+                        <UitkForKsp2.Controls.OabButton name="CourseHold" text="Hold" class="segment_button"/>
+                        <UitkForKsp2.Controls.OabButton name="CourseHeading" text="Heading" class="segment_button"/>
+                        <UitkForKsp2.Controls.OabButton name="CourseWaypoint" text="Waypoint" class="segment_button"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="HeadingRow" class="field_row" style="display: none;">
+                        <ui:IntegerField label="Heading (°)" value="90" name="HeadingInput" is-delayed="true" class="field"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="WaypointRow" class="field_row" style="display: none;">
+                        <ui:DropdownField label="Waypoint" name="WaypointField" class="field"/>
+                    </ui:VisualElement>
+                    <ui:Label text="VERTICAL" class="section-title"/>
+                    <ui:VisualElement class="selector_row">
+                        <UitkForKsp2.Controls.OabButton name="VerticalOff" text="Off" class="segment_button"/>
+                        <UitkForKsp2.Controls.OabButton name="VerticalAltitude" text="Altitude" class="segment_button"/>
+                        <UitkForKsp2.Controls.OabButton name="VerticalSpeed" text="V/S" class="segment_button"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="AltitudeRow" class="field_row" style="display: none;">
+                        <ui:IntegerField label="Altitude (m)" value="1000" name="AltitudeInput" is-delayed="true" class="field"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="VSRow" class="field_row" style="display: none;">
+                        <ui:IntegerField label="V. Speed (m/s)" value="0" name="VSInput" is-delayed="true" class="field"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
             </ui:VisualElement>
-            <ui:VisualElement name="WaypointRow" class="field_row" style="display: none;">
-                <ui:DropdownField label="Waypoint" name="WaypointField" style="flex-grow: 1;"/>
+            <ui:VisualElement name="ApproachTab" style="display: none;">
+                <ui:VisualElement name="ApproachSetup">
+                    <ui:VisualElement class="field_row">
+                        <ui:DropdownField label="Airport" name="AirportField" class="field"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="selector_row">
+                        <ui:Label text="Runway" class="selector_label"/>
+                        <ui:VisualElement name="RunwayButtons" class="runway_buttons"/>
+                    </ui:VisualElement>
+                    <UitkForKsp2.Controls.InvertedCornerBox border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="readout">
+                        <ui:VisualElement class="readout_cell"><ui:Label text="Length"/><ui:Label name="RwyLength" text="-" class="readout_value"/></ui:VisualElement>
+                        <ui:VisualElement class="readout_cell"><ui:Label text="Course"/><ui:Label name="RwyCourse" text="-" class="readout_value"/></ui:VisualElement>
+                        <ui:VisualElement class="readout_cell"><ui:Label text="Distance"/><ui:Label name="RwyDistance" text="-" class="readout_value"/></ui:VisualElement>
+                        <ui:VisualElement class="readout_cell"><ui:Label text="Elev."/><ui:Label name="RwyElevation" text="-" class="readout_value"/></ui:VisualElement>
+                    </UitkForKsp2.Controls.InvertedCornerBox>
+                    <ui:VisualElement class="field_row">
+                        <ui:FloatField label="G/S (°)" value="3" name="GlideslopeInput" is-delayed="true" class="field"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="field_row">
+                        <ui:FloatField label="Speed (m/s)" value="85" name="ApproachSpeedInput" is-delayed="true" class="field"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="field_row">
+                        <ui:IntegerField label="Minimums (m)" value="60" name="MinimumsInput" is-delayed="true" class="field"/>
+                    </ui:VisualElement>
+                    <ui:Toggle label="Autoland" name="Autoland" value="false" class="switch toggle_field"/>
+                    <ui:Toggle label="Fly fixes" name="FlyFixes" value="true" class="switch toggle_field"/>
+                    <ui:VisualElement name="ApproachHeightRow" class="field_row">
+                        <ui:IntegerField label="App. alt (m)" value="600" name="ApproachHeightInput" is-delayed="true" class="field"/>
+                    </ui:VisualElement>
+                    <UitkForKsp2.Controls.InvertedCornerBox border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="readout">
+                        <ui:VisualElement class="readout_cell readout_cell_full"><ui:Label text="Go-around"/><ui:Label name="GoAroundInfo" text="-" class="readout_value"/></ui:VisualElement>
+                    </UitkForKsp2.Controls.InvertedCornerBox>
+                    <ui:VisualElement class="action_row">
+                        <UitkForKsp2.Controls.OabButton name="ArmApproach" text="ARM APPROACH" class="action-button"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="ApproachActive" style="display: none;">
+                    <ui:Label name="ApproachTitle" text="-" class="section-title"/>
+                    <UitkForKsp2.Controls.InvertedCornerBox border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="deviation">
+                        <ui:VisualElement class="deviation_row">
+                            <ui:Label text="LOC" class="deviation_label"/>
+                            <ui:VisualElement class="deviation_scale">
+                                <ui:VisualElement class="deviation_line"/>
+                                <ui:VisualElement class="deviation_centre"/>
+                                <ui:VisualElement name="LocMarker" class="deviation_marker"/>
+                            </ui:VisualElement>
+                            <ui:Label name="LocValue" text="-" class="deviation_value"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="deviation_row">
+                            <ui:Label text="G/S" class="deviation_label"/>
+                            <ui:VisualElement class="deviation_scale">
+                                <ui:VisualElement class="deviation_line"/>
+                                <ui:VisualElement class="deviation_centre"/>
+                                <ui:VisualElement name="GsMarker" class="deviation_marker"/>
+                            </ui:VisualElement>
+                            <ui:Label name="GsValue" text="-" class="deviation_value"/>
+                        </ui:VisualElement>
+                    </UitkForKsp2.Controls.InvertedCornerBox>
+                    <UitkForKsp2.Controls.InvertedCornerBox border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="readout">
+                        <ui:VisualElement class="readout_cell"><ui:Label name="AppDistanceLabel" text="Distance"/><ui:Label name="AppDistance" text="-" class="readout_value"/></ui:VisualElement>
+                        <ui:VisualElement class="readout_cell"><ui:Label text="Height"/><ui:Label name="AppHeight" text="-" class="readout_value"/></ui:VisualElement>
+                        <ui:VisualElement class="readout_cell"><ui:Label text="Speed"/><ui:Label name="AppSpeed" text="-" class="readout_value"/></ui:VisualElement>
+                        <ui:VisualElement class="readout_cell"><ui:Label text="V/S"/><ui:Label name="AppVS" text="-" class="readout_value"/></ui:VisualElement>
+                    </UitkForKsp2.Controls.InvertedCornerBox>
+                    <ui:VisualElement class="action_row">
+                        <UitkForKsp2.Controls.OabButton name="GoAround" text="GO AROUND" class="action-button action-button-wide"/>
+                        <UitkForKsp2.Controls.OabButton name="DisarmApproach" text="DISARM" class="action-button destructive"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:Label name="ApproachWarning" text="" class="warning" style="display: none;"/>
             </ui:VisualElement>
-            <ui:VisualElement class="spacer"/>
-            <ui:VisualElement class="selector_row">
-                <ui:Label text="Vertical" class="selector_label"/>
-                <UitkForKsp2.Controls.OabButton name="VerticalOff" text="Off" class="segment_button"/>
-                <UitkForKsp2.Controls.OabButton name="VerticalAltitude" text="Altitude" class="segment_button"/>
-                <UitkForKsp2.Controls.OabButton name="VerticalSpeed" text="V/S" class="segment_button"/>
+            <ui:VisualElement name="TakeoffTab" style="display: none;">
+                <UitkForKsp2.Controls.InvertedCornerBox border-thickness="1" notch-size="5" border-color="#747680FF" background-color="#1B1E24FF" class="readout">
+                    <ui:VisualElement class="readout_cell"><ui:Label text="Runway"/><ui:Label name="ToRunway" text="-" class="readout_value"/></ui:VisualElement>
+                    <ui:VisualElement class="readout_cell"><ui:Label text="Course"/><ui:Label name="ToCourse" text="-" class="readout_value"/></ui:VisualElement>
+                    <ui:VisualElement class="readout_cell"><ui:Label text="Remaining"/><ui:Label name="ToRemaining" text="-" class="readout_value"/></ui:VisualElement>
+                    <ui:VisualElement class="readout_cell"><ui:Label text="Speed"/><ui:Label name="ToSpeed" text="-" class="readout_value"/></ui:VisualElement>
+                </UitkForKsp2.Controls.InvertedCornerBox>
+                <ui:VisualElement class="field_row">
+                    <ui:FloatField label="Rotate (m/s)" value="70" name="RotateSpeedInput" is-delayed="true" class="field"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="field_row">
+                    <ui:FloatField label="Pitch (°)" value="10" name="RotatePitchInput" is-delayed="true" class="field"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="field_row">
+                    <ui:FloatField label="Climb (m/s)" value="90" name="ClimbSpeedInput" is-delayed="true" class="field"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="field_row">
+                    <ui:IntegerField label="Accel. alt (m)" value="300" name="AccelHeightInput" is-delayed="true" class="field"/>
+                </ui:VisualElement>
+                <ui:Toggle label="Gear up after liftoff" name="GearUpToggle" value="true" class="switch toggle_field"/>
+                <ui:VisualElement class="action_row">
+                    <UitkForKsp2.Controls.OabButton name="StartTakeoff" text="TAKEOFF" class="action-button"/>
+                    <UitkForKsp2.Controls.OabButton name="CancelTakeoff" text="CANCEL" class="action-button destructive" style="display: none;"/>
+                </ui:VisualElement>
+                <ui:Label name="TakeoffWarning" text="" class="warning" style="display: none;"/>
             </ui:VisualElement>
-            <ui:VisualElement name="AltitudeRow" class="field_row" style="display: none;">
-                <ui:IntegerField label="Altitude (m)" value="1000" name="AltitudeInput" is-delayed="true" style="-unity-text-align: middle-left; flex-grow: 1;"/>
-            </ui:VisualElement>
-            <ui:VisualElement name="VSRow" class="field_row" style="display: none;">
-                <ui:IntegerField label="V. Speed (m/s)" value="0" name="VSInput" is-delayed="true" style="-unity-text-align: middle-left; flex-grow: 1;"/>
-            </ui:VisualElement>
-        </ui:VisualElement>
+        </UitkForKsp2.Controls.InvertedCornerBox>
     </UitkForKsp2.Controls.AppShell>
 </ui:UXML>
